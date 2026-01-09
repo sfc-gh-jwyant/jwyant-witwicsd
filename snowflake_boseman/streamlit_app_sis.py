@@ -1084,7 +1084,18 @@ def render_investigation(controller: GameController, case: Case, location: Locat
                 st.markdown(f"**{city}:**")
                 for clue in city_clues:
                     # Clean up any escaped or extra quotes from AI response
-                    clean_text = clue.text.strip().strip('"\'').replace('\\"', '"').replace("\\'", "'")
+                    clean_text = clue.text
+                    # First replace escaped quotes with regular quotes
+                    clean_text = clean_text.replace('\\"', '"').replace("\\'", "'")
+                    # Strip whitespace
+                    clean_text = clean_text.strip()
+                    # Remove all leading quotes (handles "", ", etc.)
+                    while clean_text.startswith('"') or clean_text.startswith("'"):
+                        clean_text = clean_text[1:]
+                    # Remove all trailing quotes
+                    while clean_text.endswith('"') or clean_text.endswith("'"):
+                        clean_text = clean_text[:-1]
+                    clean_text = clean_text.strip()
                     st.text(f'"{clean_text}"')
         else:
             st.info("No clues yet. Investigate to gather clues!")
