@@ -1035,22 +1035,39 @@ def init_session_state():
 
 def main():
     """Main application entry point."""
-    st.set_page_config(
-        page_title="Where is Snowflake Boseman Montana?",
-        page_icon="🔍",
-        layout="wide",
-        initial_sidebar_state="collapsed",
-    )
+    try:
+        st.set_page_config(
+            page_title="Where is Snowflake Boseman Montana?",
+            page_icon="🔍",
+            layout="wide",
+            initial_sidebar_state="collapsed",
+        )
+    except:
+        pass  # Already set
     
-    apply_theme()
+    # Show something immediately
+    st.write("🔍 Loading game...")
     
-    init_session_state()
+    try:
+        apply_theme()
+        st.write("✅ Theme applied")
+    except Exception as e:
+        st.error(f"Theme error: {e}")
+    
+    try:
+        init_session_state()
+        st.write("✅ Session state initialized")
+    except Exception as e:
+        st.error(f"Session state error: {e}")
+        st.exception(e)
+        st.stop()
     
     controller: GameController = st.session_state.controller
     
     # Get player
     try:
         player = controller.get_or_create_player()
+        st.write(f"✅ Player loaded: {player.display_name}")
     except Exception as e:
         st.error(f"❌ Error connecting to database: {e}")
         st.info("Make sure the database tables are created. Run deploy_standard.sql and seed_data.sql first.")
@@ -1059,6 +1076,7 @@ def main():
     
     # Route based on game state
     state = st.session_state.game_state
+    st.write(f"✅ Game state: {state.value}")
     
     if state == GameState.MAIN_MENU:
         try:
