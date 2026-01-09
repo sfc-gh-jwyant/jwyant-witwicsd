@@ -1408,7 +1408,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         deck = pdk.Deck(
             layers=[current_layer, dest_layer, current_text_layer, dest_text_layer],
             initial_view_state=view_state,
-            map_style="mapbox://styles/mapbox/dark-v10",
+            map_style="dark",  # Built-in style: "dark", "light", "road", "satellite"
             tooltip={"text": "{city}\n⏱️ {travel_time} hrs"},
         )
         
