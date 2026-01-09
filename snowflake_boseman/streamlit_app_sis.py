@@ -1103,18 +1103,25 @@ def main():
     
     # Route based on game state
     state = st.session_state.game_state
+    st.info(f"🎮 Game State: {state.value}")
     
     if state == GameState.MAIN_MENU:
-        has_case = controller.get_current_case() is not None
-        result = render_main_menu(player, has_case)
-        
-        if result["action"] == "new_case":
-            controller.start_new_case(result.get("difficulty", 1))
-            st.session_state.game_state = GameState.INVESTIGATION
-            st.rerun()
-        elif result["action"] == "continue":
-            st.session_state.game_state = GameState.INVESTIGATION
-            st.rerun()
+        try:
+            has_case = controller.get_current_case() is not None
+            st.info(f"📋 Has active case: {has_case}")
+            result = render_main_menu(player, has_case)
+            st.info(f"🔘 Menu result: {result}")
+            
+            if result["action"] == "new_case":
+                controller.start_new_case(result.get("difficulty", 1))
+                st.session_state.game_state = GameState.INVESTIGATION
+                st.rerun()
+            elif result["action"] == "continue":
+                st.session_state.game_state = GameState.INVESTIGATION
+                st.rerun()
+        except Exception as e:
+            st.error(f"Error in main menu: {e}")
+            st.exception(e)
     
     elif state == GameState.INVESTIGATION:
         case = controller.get_current_case()
