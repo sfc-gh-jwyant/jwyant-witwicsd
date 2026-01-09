@@ -812,7 +812,7 @@ Generate ONLY the witness quote, nothing else."""
             
             result = session.sql(f"""
                 SELECT AI_COMPLETE(
-                    model => 'llama3.1-8b',
+                    model => 'llama3.1-70b',
                     prompt => '{safe_prompt}',
                     model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
                 ) as response
@@ -1083,7 +1083,9 @@ def render_investigation(controller: GameController, case: Case, location: Locat
             for city, city_clues in clues_by_city.items():
                 st.markdown(f"**{city}:**")
                 for clue in city_clues:
-                    st.text(f'"{clue.text}"')
+                    # Clean up any escaped or extra quotes from AI response
+                    clean_text = clue.text.strip().strip('"\'').replace('\\"', '"').replace("\\'", "'")
+                    st.text(f'"{clean_text}"')
         else:
             st.info("No clues yet. Investigate to gather clues!")
     
