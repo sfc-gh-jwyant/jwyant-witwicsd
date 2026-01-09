@@ -64,6 +64,7 @@ DIFFICULTY_CONFIG = {
         "min_locations": 3,
         "max_locations": 4,
         "red_herrings": 0,
+        "decoy_destinations": 2,  # Number of wrong destinations to show
     },
     2: {
         "name": "WITH (NOLOCK)",
@@ -73,6 +74,7 @@ DIFFICULTY_CONFIG = {
         "min_locations": 4,
         "max_locations": 5,
         "red_herrings": 1,
+        "decoy_destinations": 3,
     },
     3: {
         "name": "Foreign Key Violation",
@@ -82,6 +84,7 @@ DIFFICULTY_CONFIG = {
         "min_locations": 5,
         "max_locations": 7,
         "red_herrings": 2,
+        "decoy_destinations": 5,
     },
     4: {
         "name": "Deadlock Victim",
@@ -91,6 +94,7 @@ DIFFICULTY_CONFIG = {
         "min_locations": 6,
         "max_locations": 8,
         "red_herrings": 3,
+        "decoy_destinations": 7,
     },
     5: {
         "name": "Little Bobby Tables",
@@ -100,6 +104,7 @@ DIFFICULTY_CONFIG = {
         "min_locations": 8,
         "max_locations": 10,
         "red_herrings": 4,
+        "decoy_destinations": 10,
     },
 }
 
@@ -550,6 +555,42 @@ class GameController:
         
         available.sort(key=lambda l: current._haversine_distance(l))
         return available
+    
+    def get_travel_options(self) -> List[Location]:
+        """Get limited travel options: correct destination + decoys based on difficulty."""
+        case = self.get_current_case()
+        current = self.get_current_location()
+        if not case or not current:
+            return []
+        
+        # Get the correct next location
+        next_location_id = case.get_suspect_next_location()
+        next_location = self.get_location_by_id(next_location_id) if next_location_id else None
+        
+        # Get all available destinations
+        all_available = self.get_available_destinations()
+        
+        # Determine number of decoys based on difficulty
+        config = DIFFICULTY_CONFIG.get(case.difficulty, DIFFICULTY_CONFIG[3])
+        num_decoys = config.get("decoy_destinations", 5)
+        
+        # Build options list
+        options = []
+        
+        # Always include the correct destination if it exists and is reachable
+        if next_location and next_location in all_available:
+            options.append(next_location)
+            # Remove from available to avoid duplicates
+            all_available = [loc for loc in all_available if loc.id != next_location.id]
+        
+        # Add random decoy destinations
+        decoys = random.sample(all_available, min(num_decoys, len(all_available)))
+        options.extend(decoys)
+        
+        # Shuffle to randomize order (so correct answer isn't always first)
+        random.shuffle(options)
+        
+        return options
     
     def travel_to(self, destination_id: str) -> Dict:
         """Travel to a new location."""
@@ -1250,7 +1291,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
 
 
 def render_travel(controller: GameController, case: Case, current_location: Location) -> Dict:
-    """Render travel screen."""
+    """Render travel screen with map and limited destination options."""
     result = {"action": None}
     
     st.title(f"✈️ Travel from {current_location.city}")
@@ -1265,45 +1306,68 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
     
     st.divider()
     
-    destinations = controller.get_available_destinations()
+    # Get limited travel options (correct + decoys, randomized)
+    destinations = controller.get_travel_options()
     
     if not destinations:
         st.warning("⚠️ No destinations available with remaining time!")
         return result
     
-    # Group by continent
-    by_continent: Dict[str, List[Location]] = {}
-    for loc in destinations:
-        if loc.continent not in by_continent:
-            by_continent[loc.continent] = []
-        by_continent[loc.continent].append(loc)
+    # Create two columns: map on left, destinations on right
+    col_map, col_list = st.columns([2, 1])
     
-    # Continent selector
-    continents = sorted(by_continent.keys())
-    selected_continent = st.selectbox(
-        "🌍 Select Continent",
-        options=continents,
-        format_func=lambda x: f"{x} ({len(by_continent[x])} destinations)"
-    )
-    
-    st.divider()
-    
-    # Show destinations for selected continent
-    if selected_continent:
-        locs = by_continent[selected_continent]
-        st.subheader(f"Destinations in {selected_continent}")
+    with col_map:
+        st.subheader("🗺️ Available Destinations")
         
-        for loc in locs[:20]:
+        # Build map data
+        import pandas as pd
+        
+        # Current location (different color)
+        current_data = [{
+            "city": f"📍 {current_location.city} (You are here)",
+            "lat": current_location.latitude,
+            "lon": current_location.longitude,
+            "size": 800,
+            "color": "#FF6B6B",  # Red for current
+        }]
+        
+        # Destination options
+        dest_data = [{
+            "city": f"{loc.city}, {loc.country}",
+            "lat": loc.latitude,
+            "lon": loc.longitude,
+            "size": 500,
+            "color": "#4ECDC4",  # Teal for destinations
+            "id": loc.id,
+        } for loc in destinations]
+        
+        all_points = current_data + dest_data
+        df = pd.DataFrame(all_points)
+        
+        # Display map using st.map (simple, works in SiS)
+        st.map(df, latitude="lat", longitude="lon", size="size", color="color")
+        
+        # Show legend
+        st.caption("📍 Red = Your location | 🔵 Teal = Available destinations")
+    
+    with col_list:
+        st.subheader("Choose Destination")
+        
+        # Store selected destination in session state for map click handling
+        if "selected_destination" not in st.session_state:
+            st.session_state.selected_destination = None
+        
+        # Show destination buttons
+        for loc in destinations:
             travel_time = current_location.get_travel_time_to(loc)
             
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                st.write(f"**{loc.city}**, {loc.country}")
-            with col2:
-                st.caption(f"⏱️ {travel_time} hrs")
-            with col3:
-                if st.button("Go", key=f"go_{loc.id}"):
+            # Create a card-like display for each destination
+            with st.container():
+                st.markdown(f"**{loc.city}**")
+                st.caption(f"{loc.country} • {loc.continent} • ⏱️ {travel_time} hrs")
+                if st.button(f"✈️ Fly to {loc.city}", key=f"travel_{loc.id}", use_container_width=True):
                     result = {"action": "travel_to", "destination_id": loc.id}
+                st.markdown("---")
     
     return result
 
