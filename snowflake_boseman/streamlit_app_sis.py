@@ -779,65 +779,44 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     """Render main menu."""
     result = {"action": None}
     
-    # Header
-    st.markdown("""
-    <div style="text-align: center; padding: 40px 20px; margin-bottom: 30px;">
-        <h1 style="color: #C4A35A; font-size: 2em; margin-bottom: 10px;">
-            🔍 WHERE IN THE WORLD IS 🔍
-        </h1>
-        <h2 style="color: #F5E6D3; font-size: 1.8em; margin: 0;">
-            ❄️ SNOWFLAKE BOSEMAN MONTANA? ❄️
-        </h2>
-        <p style="color: #D4B896; font-size: 14px; margin-top: 16px; font-style: italic;">
-            A geography mystery adventure
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Simple header using native Streamlit
+    st.title("🔍 Where in the World is Snowflake Boseman Montana? 🔍")
+    st.subheader("A geography mystery adventure")
     
-    # Player card
-    col1, col2, col3 = st.columns([1, 2, 1])
+    st.divider()
+    
+    # Player info
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Agent", player.display_name)
     with col2:
-        st.markdown(f"""
-        <div style="
-            background: #D4B896;
-            border: 3px solid #3D2817;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 30px;
-        ">
-            <div style="font-size: 32px;">{player.rank_icon}</div>
-            <div style="color: #2A1810; font-size: 18px; font-weight: bold;">
-                Agent {player.display_name}
-            </div>
-            <div style="color: #555; font-size: 14px;">Rank: {player.rank}</div>
-            <div style="display: flex; justify-content: center; gap: 30px; margin-top: 16px;">
-                <div style="color: #3D2817;">
-                    <div style="font-size: 24px; font-weight: bold;">{player.cases_solved}</div>
-                    <div style="font-size: 11px;">Cases Solved</div>
-                </div>
-                <div style="color: #3D2817;">
-                    <div style="font-size: 24px; font-weight: bold;">{player.total_score:,}</div>
-                    <div style="font-size: 11px;">Total Score</div>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if has_active_case:
-            if st.button("▶️ CONTINUE INVESTIGATION", use_container_width=True, type="primary"):
-                result = {"action": "continue"}
-            st.markdown("<br>", unsafe_allow_html=True)
-        
-        difficulty = st.selectbox(
-            "Difficulty",
-            options=[1, 2, 3, 4, 5],
-            format_func=lambda x: f"{DIFFICULTY_CONFIG[x]['name']}",
-            label_visibility="collapsed",
-        )
-        
-        if st.button("🔍 START NEW CASE", use_container_width=True):
-            result = {"action": "new_case", "difficulty": difficulty}
+        st.metric("Rank", f"{player.rank_icon} {player.rank}")
+    with col3:
+        st.metric("Cases Solved", player.cases_solved)
+    
+    st.divider()
+    
+    # Continue button if there's an active case
+    if has_active_case:
+        st.warning("📋 You have a case in progress!")
+        if st.button("▶️ CONTINUE INVESTIGATION", use_container_width=True, type="primary"):
+            result = {"action": "continue"}
+    
+    st.subheader("🆕 Start New Case")
+    
+    # Difficulty selector
+    difficulty = st.selectbox(
+        "Select Difficulty",
+        options=[1, 2, 3, 4, 5],
+        format_func=lambda x: f"{DIFFICULTY_CONFIG[x]['name']} - {DIFFICULTY_CONFIG[x]['description']}",
+    )
+    
+    # Show difficulty details
+    config = DIFFICULTY_CONFIG[difficulty]
+    st.caption(f"⏱️ Time: {config['time_budget']} hours | 📍 Locations: {config['min_locations']}-{config['max_locations']} | 🔴 Red Herrings: {config['red_herrings']}")
+    
+    if st.button("🔍 START NEW CASE", use_container_width=True, type="primary"):
+        result = {"action": "new_case", "difficulty": difficulty}
     
     return result
 
@@ -1107,6 +1086,7 @@ def main():
     
     if state == GameState.MAIN_MENU:
         try:
+            st.info("📋 Checking for active case...")
             has_case = controller.get_current_case() is not None
             st.info(f"📋 Has active case: {has_case}")
             result = render_main_menu(player, has_case)
