@@ -909,6 +909,9 @@ Generate ONLY the witness quote, nothing else."""
     def _call_ai_complete(self, prompt: str) -> Optional[str]:
         """Call Snowflake Cortex AI_COMPLETE function."""
         try:
+            # Increment AI prompt counter
+            st.session_state.ai_prompt_count = st.session_state.get("ai_prompt_count", 0) + 1
+            
             session = get_snowflake_session()
             # Escape single quotes in prompt
             safe_prompt = prompt.replace("'", "''")
@@ -1156,7 +1159,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     st.caption(f"{location.continent}")
     
     # Header with case info
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.subheader("📋 Current Case")
@@ -1174,6 +1177,9 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     
     with col3:
         st.metric("Locations Visited", len(case.progress.locations_visited) if case.progress else 0)
+    
+    with col4:
+        st.metric("🤖 AI Prompts", st.session_state.get("ai_prompt_count", 0))
     
     st.divider()
     
@@ -1383,6 +1389,9 @@ def init_session_state():
     if "ai_model" not in st.session_state:
         st.session_state.ai_model = DEFAULT_AI_MODEL
     
+    if "ai_prompt_count" not in st.session_state:
+        st.session_state.ai_prompt_count = 0
+    
     # Restore case to controller from session state
     controller = st.session_state.controller
     if st.session_state.current_case and not controller._current_case:
@@ -1427,6 +1436,8 @@ def main():
             
             if result["action"] == "new_case":
                 try:
+                    # Reset AI prompt counter for new case
+                    st.session_state.ai_prompt_count = 0
                     case = controller.start_new_case(result.get("difficulty", 1))
                     # Store in session state for persistence
                     st.session_state.current_case = case
@@ -1584,6 +1595,7 @@ def main():
         if result["action"] in ("main_menu", "new_case"):
             st.session_state.case_result = None
             st.session_state.controller = GameController()  # Reset controller
+            st.session_state.ai_prompt_count = 0  # Reset AI prompt counter
             st.session_state.game_state = GameState.MAIN_MENU
             st.rerun()
 
