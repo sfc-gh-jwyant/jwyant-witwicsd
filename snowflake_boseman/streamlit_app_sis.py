@@ -900,18 +900,25 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
     """Render travel screen."""
     result = {"action": None}
     
-    st.markdown(f"### ✈️ Travel from {current_location.city}")
+    st.title(f"✈️ Travel from {current_location.city}")
+    st.caption(f"Current location: {current_location.city}, {current_location.country} ({current_location.continent})")
     
-    if st.button("← Back to Investigation"):
-        return {"action": "back"}
+    col_back, col_time = st.columns([1, 1])
+    with col_back:
+        if st.button("← Back to Investigation", use_container_width=True):
+            return {"action": "back"}
+    with col_time:
+        st.metric("Time Remaining", f"{controller.get_time_remaining()} hrs")
+    
+    st.divider()
     
     destinations = controller.get_available_destinations()
     
     if not destinations:
-        st.warning("No destinations available with remaining time!")
+        st.warning("⚠️ No destinations available with remaining time!")
         return result
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.subheader("🌍 Choose Your Destination")
     
     # Group by continent
     by_continent: Dict[str, List[Location]] = {}
@@ -921,20 +928,20 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         by_continent[loc.continent].append(loc)
     
     for continent, locs in sorted(by_continent.items()):
-        with st.expander(f"🌍 {continent} ({len(locs)} destinations)"):
-            for loc in locs[:10]:  # Limit per continent
+        with st.expander(f"🌍 {continent} ({len(locs)} destinations)", expanded=(len(by_continent) <= 3)):
+            for loc in locs[:15]:  # Limit per continent
                 travel_time = current_location.get_travel_time_to(loc)
-                col1, col2, col3 = st.columns([3, 1, 1])
                 
-                with col1:
-                    st.markdown(f"**{loc.city}**, {loc.country}")
-                
-                with col2:
-                    st.markdown(f"⏱️ {travel_time} hrs")
-                
-                with col3:
-                    if st.button("Go", key=f"travel_{loc.id}"):
-                        result = {"action": "travel_to", "destination_id": loc.id}
+                # Use a container for each destination
+                with st.container():
+                    cols = st.columns([4, 2, 2])
+                    with cols[0]:
+                        st.write(f"**{loc.city}**, {loc.country}")
+                    with cols[1]:
+                        st.write(f"⏱️ {travel_time} hrs")
+                    with cols[2]:
+                        if st.button("✈️ Go", key=f"travel_{loc.id}", use_container_width=True):
+                            result = {"action": "travel_to", "destination_id": loc.id}
     
     return result
 
