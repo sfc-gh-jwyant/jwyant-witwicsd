@@ -825,72 +825,54 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     """Render investigation screen."""
     result = {"action": None}
     
+    # Title
+    st.title(f"📍 {location.city}, {location.country}")
+    st.caption(f"{location.continent}")
+    
     # Header with case info
-    col1, col2, col3 = st.columns([2, 3, 2])
+    col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown(f"""
-        <div style="background: #D4B896; padding: 15px; border-radius: 8px;">
-            <div style="color: #2A1810; font-weight: bold;">📋 Current Case</div>
-            <div style="color: #555; font-size: 14px;">Stolen: {case.stolen_item}</div>
-            <div style="color: #555; font-size: 14px;">Difficulty: {DIFFICULTY_CONFIG[case.difficulty]['name']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.subheader("📋 Current Case")
+        st.write(f"**Stolen:** {case.stolen_item}")
+        st.write(f"**Difficulty:** {DIFFICULTY_CONFIG[case.difficulty]['name']}")
     
     with col2:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 15px;">
-            <div style="color: #C4A35A; font-size: 24px; font-weight: bold;">
-                📍 {location.city}, {location.country}
-            </div>
-            <div style="color: #D4B896;">{location.continent}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        urgency = controller.get_urgency_level()
+        if urgency == "critical":
+            st.error(f"⏱️ **{controller.get_time_remaining()} hours** remaining!")
+        elif urgency == "warning":
+            st.warning(f"⏱️ **{controller.get_time_remaining()} hours** remaining")
+        else:
+            st.success(f"⏱️ **{controller.get_time_remaining()} hours** remaining")
     
     with col3:
-        urgency = controller.get_urgency_level()
-        time_color = "#4CAF50" if urgency == "normal" else "#FFC107" if urgency == "warning" else "#F44336"
-        st.markdown(f"""
-        <div style="background: #3D2817; padding: 15px; border-radius: 8px; text-align: center;">
-            <div style="color: {time_color}; font-size: 24px; font-weight: bold;">
-                ⏱️ {controller.get_time_remaining()} hrs
-            </div>
-            <div style="color: #D4B896; font-size: 12px;">Time Remaining</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("Locations Visited", len(case.progress.locations_visited) if case.progress else 0)
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
     
     # Main content
     col_left, col_right = st.columns([2, 1])
     
     with col_left:
-        # Location art placeholder
-        render_art_placeholder("Location", location.city, 400, 250)
-        
+        st.subheader(f"🏙️ Welcome to {location.city}")
         if location.description:
-            st.markdown(f"""
-            <div style="background: #D4B896; padding: 15px; border-radius: 8px; margin-top: 15px;">
-                <div style="color: #2A1810;">{location.description}</div>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info(location.description)
+        else:
+            st.info(f"You've arrived in {location.city}, {location.country}. Look around for clues!")
     
     with col_right:
-        st.markdown("### 📔 Clue Notebook")
+        st.subheader("📔 Clue Notebook")
         
         clues = controller.get_gathered_clues()
         if clues:
             for clue in clues[-5:]:  # Show last 5 clues
                 icon = "🌍" if clue.clue_type == "destination" else "🔎"
-                st.markdown(f"""
-                <div style="background: #F5E6D3; padding: 10px; border-radius: 4px; margin-bottom: 8px; border-left: 3px solid #C4A35A;">
-                    <span>{icon}</span> {clue.text}
-                </div>
-                """, unsafe_allow_html=True)
+                st.info(f"{icon} {clue.text}")
         else:
             st.info("No clues yet. Investigate to gather clues!")
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.divider()
     
     # Action buttons
     col1, col2, col3, col4 = st.columns(4)
@@ -1050,22 +1032,6 @@ def main():
     
     apply_theme()
     
-    # Show title immediately so user knows app is loading
-    st.markdown("""
-    <div style="text-align: center; padding: 20px;">
-        <h1 style="color: #C4A35A;">🔍 Where in the World is Snowflake Boseman Montana? 🔍</h1>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Test database connection first
-    try:
-        session = get_snowflake_session()
-        st.success("✅ Connected to Snowflake!")
-    except Exception as e:
-        st.error(f"❌ Failed to connect to Snowflake: {e}")
-        st.exception(e)
-        st.stop()
-    
     init_session_state()
     
     controller: GameController = st.session_state.controller
@@ -1073,24 +1039,19 @@ def main():
     # Get player
     try:
         player = controller.get_or_create_player()
-        st.success(f"✅ Welcome, {player.display_name}!")
     except Exception as e:
-        st.error(f"Error creating player: {e}")
-        st.exception(e)
+        st.error(f"❌ Error connecting to database: {e}")
         st.info("Make sure the database tables are created. Run deploy_standard.sql and seed_data.sql first.")
+        st.exception(e)
         st.stop()
     
     # Route based on game state
     state = st.session_state.game_state
-    st.info(f"🎮 Game State: {state.value}")
     
     if state == GameState.MAIN_MENU:
         try:
-            st.info("📋 Checking for active case...")
             has_case = controller.get_current_case() is not None
-            st.info(f"📋 Has active case: {has_case}")
             result = render_main_menu(player, has_case)
-            st.info(f"🔘 Menu result: {result}")
             
             if result["action"] == "new_case":
                 controller.start_new_case(result.get("difficulty", 1))
