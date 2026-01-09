@@ -1,0 +1,40 @@
+[project]
+name = "snowflake-boseman-montana"
+version = "1.0.0"
+description = "Where in the World is Snowflake Boseman Montana? - A geography mystery game"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Snowflake Demo"}
+]
+keywords = ["streamlit", "snowflake", "game", "geography", "carmen-sandiego"]
+
+dependencies = [
+    "streamlit>=1.24.0",
+    "pandas>=1.5.0",
+    "pydeck>=0.8.0",
+    "snowflake-snowpark-python>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
