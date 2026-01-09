@@ -1015,16 +1015,19 @@ Generate ONLY the witness quote, nothing else."""
                 "score": score,
             }
         elif not is_at_location:
-            return {
-                "won": False,
-                "message": "The suspect isn't here! Keep following the trail.",
-                "game_over": False,
-            }
-        else:
+            # Wrong location - game over
             case.status = CaseStatus.LOST_WRONG_ARREST
             return {
                 "won": False,
-                "message": f"Wrong suspect! {case.suspect.name} got away.",
+                "message": f"The suspect isn't here! While you searched the wrong city, {case.suspect.name} escaped!",
+                "game_over": True,
+            }
+        else:
+            # Wrong suspect - game over
+            case.status = CaseStatus.LOST_WRONG_ARREST
+            return {
+                "won": False,
+                "message": f"Wrong suspect! While you arrested the wrong person, {case.suspect.name} got away!",
                 "game_over": True,
             }
     
