@@ -1317,57 +1317,121 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
     col_map, col_list = st.columns([2, 1])
     
     with col_map:
-        st.subheader("🗺️ Available Destinations")
+        st.subheader("🗺️ Select a Destination")
         
-        # Build map data
+        # Build map data with pydeck for labels
         import pandas as pd
+        import pydeck as pdk
         
-        # Current location (different color)
-        current_data = [{
-            "city": f"📍 {current_location.city} (You are here)",
+        # Current location data
+        current_df = pd.DataFrame([{
+            "name": f"📍 YOU ARE HERE",
+            "city": current_location.city,
             "lat": current_location.latitude,
             "lon": current_location.longitude,
-            "size": 800,
-            "color": "#FF6B6B",  # Red for current
-        }]
+        }])
         
-        # Destination options
-        dest_data = [{
+        # Destination data
+        dest_df = pd.DataFrame([{
+            "name": loc.city,
             "city": f"{loc.city}, {loc.country}",
             "lat": loc.latitude,
             "lon": loc.longitude,
-            "size": 500,
-            "color": "#4ECDC4",  # Teal for destinations
             "id": loc.id,
-        } for loc in destinations]
+            "travel_time": current_location.get_travel_time_to(loc),
+        } for loc in destinations])
         
-        all_points = current_data + dest_data
-        df = pd.DataFrame(all_points)
+        # Calculate center point for initial view
+        all_lats = [current_location.latitude] + [loc.latitude for loc in destinations]
+        all_lons = [current_location.longitude] + [loc.longitude for loc in destinations]
+        center_lat = sum(all_lats) / len(all_lats)
+        center_lon = sum(all_lons) / len(all_lons)
         
-        # Display map using st.map (simple, works in SiS)
-        st.map(df, latitude="lat", longitude="lon", size="size", color="color")
+        # Create pydeck layers
+        # Current location - red marker
+        current_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=current_df,
+            get_position=["lon", "lat"],
+            get_radius=80000,
+            get_fill_color=[255, 107, 107, 200],  # Red
+            pickable=False,
+        )
         
-        # Show legend
-        st.caption("📍 Red = Your location | 🔵 Teal = Available destinations")
+        # Current location label
+        current_text_layer = pdk.Layer(
+            "TextLayer",
+            data=current_df,
+            get_position=["lon", "lat"],
+            get_text="name",
+            get_size=14,
+            get_color=[255, 255, 255],
+            get_angle=0,
+            get_text_anchor="'middle'",
+            get_alignment_baseline="'bottom'",
+            get_pixel_offset=[0, -15],
+        )
+        
+        # Destination markers - teal
+        dest_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=dest_df,
+            get_position=["lon", "lat"],
+            get_radius=60000,
+            get_fill_color=[78, 205, 196, 200],  # Teal
+            pickable=True,
+            auto_highlight=True,
+        )
+        
+        # Destination labels
+        dest_text_layer = pdk.Layer(
+            "TextLayer",
+            data=dest_df,
+            get_position=["lon", "lat"],
+            get_text="name",
+            get_size=12,
+            get_color=[255, 255, 255],
+            get_angle=0,
+            get_text_anchor="'middle'",
+            get_alignment_baseline="'bottom'",
+            get_pixel_offset=[0, -12],
+        )
+        
+        # Create the deck
+        view_state = pdk.ViewState(
+            latitude=center_lat,
+            longitude=center_lon,
+            zoom=1.5,
+            pitch=0,
+        )
+        
+        deck = pdk.Deck(
+            layers=[current_layer, dest_layer, current_text_layer, dest_text_layer],
+            initial_view_state=view_state,
+            map_style="mapbox://styles/mapbox/dark-v10",
+            tooltip={"text": "{city}\n⏱️ {travel_time} hrs"},
+        )
+        
+        # Display the map
+        st.pydeck_chart(deck)
+        
+        # Legend
+        st.caption("🔴 Your location | 🔵 Click a destination below to travel")
     
     with col_list:
-        st.subheader("Choose Destination")
+        st.subheader("✈️ Fly To:")
         
-        # Store selected destination in session state for map click handling
-        if "selected_destination" not in st.session_state:
-            st.session_state.selected_destination = None
-        
-        # Show destination buttons
+        # Show destination buttons as a selectable list
         for loc in destinations:
             travel_time = current_location.get_travel_time_to(loc)
             
-            # Create a card-like display for each destination
-            with st.container():
-                st.markdown(f"**{loc.city}**")
-                st.caption(f"{loc.country} • {loc.continent} • ⏱️ {travel_time} hrs")
-                if st.button(f"✈️ Fly to {loc.city}", key=f"travel_{loc.id}", use_container_width=True):
-                    result = {"action": "travel_to", "destination_id": loc.id}
-                st.markdown("---")
+            if st.button(
+                f"✈️ {loc.city}, {loc.country}\n⏱️ {travel_time} hrs",
+                key=f"travel_{loc.id}",
+                use_container_width=True,
+                help=f"Fly to {loc.city} ({loc.continent})"
+            ):
+                result = {"action": "travel_to", "destination_id": loc.id}
     
     return result
 
