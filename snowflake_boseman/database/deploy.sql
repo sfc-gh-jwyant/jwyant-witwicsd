@@ -65,6 +65,7 @@ CREATE OR REPLACE HYBRID TABLE players (
     rank VARCHAR DEFAULT 'Rookie',
     cases_solved INT DEFAULT 0,
     total_score INT DEFAULT 0,
+    ai_prompt_count INT DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 

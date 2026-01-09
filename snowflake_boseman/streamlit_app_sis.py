@@ -195,6 +195,7 @@ class Player:
     rank: str = "Rookie"
     cases_solved: int = 0
     total_score: int = 0
+    ai_prompt_count: int = 0
     
     @property
     def display_name(self) -> str:
@@ -220,6 +221,7 @@ class Player:
             rank=data.get("RANK", data.get("rank", "Rookie")),
             cases_solved=data.get("CASES_SOLVED", data.get("cases_solved", 0)),
             total_score=data.get("TOTAL_SCORE", data.get("total_score", 0)),
+            ai_prompt_count=data.get("AI_PROMPT_COUNT", data.get("ai_prompt_count", 0)),
         )
     
     def update_rank(self) -> None:
@@ -413,8 +415,8 @@ class GameController:
             self._current_player = Player.from_dict(rows[0])
         else:
             execute_write(f"""
-                INSERT INTO {TABLE_PREFIX}players (player_id, snowflake_user, rank, cases_solved, total_score)
-                VALUES ('{player_id}', '{player_id}', 'Rookie', 0, 0)
+                INSERT INTO {TABLE_PREFIX}players (player_id, snowflake_user, rank, cases_solved, total_score, ai_prompt_count)
+                VALUES ('{player_id}', '{player_id}', 'Rookie', 0, 0, 0)
             """)
             self._current_player = Player(
                 id=player_id,
@@ -422,6 +424,7 @@ class GameController:
                 rank="Rookie",
                 cases_solved=0,
                 total_score=0,
+                ai_prompt_count=0,
             )
         
         return self._current_player
@@ -909,9 +912,6 @@ Generate ONLY the witness quote, nothing else."""
     def _call_ai_complete(self, prompt: str) -> Optional[str]:
         """Call Snowflake Cortex AI_COMPLETE function."""
         try:
-            # Increment AI prompt counter
-            st.session_state.ai_prompt_count = st.session_state.get("ai_prompt_count", 0) + 1
-            
             session = get_snowflake_session()
             # Escape single quotes in prompt
             safe_prompt = prompt.replace("'", "''")
@@ -926,6 +926,15 @@ Generate ONLY the witness quote, nothing else."""
                     model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
                 ) as response
             """).collect()
+            
+            # Increment and persist AI prompt counter for player
+            if self._current_player:
+                self._current_player.ai_prompt_count += 1
+                execute_write(f"""
+                    UPDATE {TABLE_PREFIX}players 
+                    SET ai_prompt_count = ai_prompt_count + 1 
+                    WHERE player_id = '{self._current_player.id}'
+                """)
             
             if result and len(result) > 0:
                 response = result[0]['RESPONSE']
@@ -1179,7 +1188,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         st.metric("Locations Visited", len(case.progress.locations_visited) if case.progress else 0)
     
     with col4:
-        st.metric("🤖 AI Prompts", st.session_state.get("ai_prompt_count", 0))
+        st.metric("🤖 AI Prompts", player.ai_prompt_count)
     
     st.divider()
     
@@ -1389,9 +1398,6 @@ def init_session_state():
     if "ai_model" not in st.session_state:
         st.session_state.ai_model = DEFAULT_AI_MODEL
     
-    if "ai_prompt_count" not in st.session_state:
-        st.session_state.ai_prompt_count = 0
-    
     # Restore case to controller from session state
     controller = st.session_state.controller
     if st.session_state.current_case and not controller._current_case:
@@ -1436,8 +1442,6 @@ def main():
             
             if result["action"] == "new_case":
                 try:
-                    # Reset AI prompt counter for new case
-                    st.session_state.ai_prompt_count = 0
                     case = controller.start_new_case(result.get("difficulty", 1))
                     # Store in session state for persistence
                     st.session_state.current_case = case
@@ -1595,7 +1599,6 @@ def main():
         if result["action"] in ("main_menu", "new_case"):
             st.session_state.case_result = None
             st.session_state.controller = GameController()  # Reset controller
-            st.session_state.ai_prompt_count = 0  # Reset AI prompt counter
             st.session_state.game_state = GameState.MAIN_MENU
             st.rerun()
 
