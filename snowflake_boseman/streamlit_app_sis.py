@@ -592,38 +592,176 @@ class GameController:
         return clues
     
     def _generate_clues(self, case: Case, current: Location, next_loc: Optional[Location]) -> List[Clue]:
-        """Generate clues for investigation."""
+        """Generate clues for investigation using Cortex AI."""
         clues = []
+        difficulty = case.difficulty
+        config = DIFFICULTY_CONFIG[difficulty]
         
         # Destination clue
         if next_loc:
-            dest_hints = [
-                f"I overheard them mention heading to a city in {next_loc.continent}.",
-                f"They were looking at maps of {next_loc.country}.",
-                f"Someone mentioned they're going somewhere near latitude {next_loc.latitude:.0f}.",
-            ]
-            clues.append(Clue(
-                id=f"clue_{uuid.uuid4().hex[:8]}",
-                clue_type="destination",
-                text=random.choice(dest_hints),
-                source="witness",
-            ))
+            dest_clue = self._generate_destination_clue_with_ai(next_loc, difficulty)
+            clues.append(dest_clue)
         
         # Suspect clue
-        suspect_hints = [
-            f"The person had {case.suspect.hair_color.lower()} hair.",
-            f"They mentioned something about {case.suspect.hobby.lower()}.",
-            f"I think they were driving a {case.suspect.vehicle.lower()}.",
-            f"They ordered {case.suspect.favorite_food.lower()} at the restaurant.",
-        ]
-        clues.append(Clue(
-            id=f"clue_{uuid.uuid4().hex[:8]}",
-            clue_type="suspect",
-            text=random.choice(suspect_hints),
-            source="witness",
-        ))
+        suspect_clue = self._generate_suspect_clue_with_ai(case.suspect, difficulty)
+        clues.append(suspect_clue)
+        
+        # Add red herrings based on difficulty
+        num_red_herrings = config.get("red_herrings", 0)
+        if num_red_herrings > 0 and random.random() < 0.5:  # 50% chance per investigation
+            red_herring = self._generate_red_herring_with_ai(difficulty)
+            clues.append(red_herring)
         
         return clues
+    
+    def _generate_destination_clue_with_ai(self, next_loc: Location, difficulty: int) -> Clue:
+        """Generate a destination clue using Cortex AI."""
+        # Check if there are multiple cities in this country
+        all_locs = self.get_all_locations()
+        cities_in_country = [l for l in all_locs if l.country == next_loc.country]
+        multiple_cities = len(cities_in_country) > 1
+        
+        # Build difficulty-aware prompt
+        difficulty_desc = {
+            1: "very obvious and easy to understand",
+            2: "clear but not too direct",
+            3: "somewhat cryptic, requiring some thought",
+            4: "cryptic and puzzle-like",
+            5: "extremely cryptic, like a riddle"
+        }
+        
+        # Country naming rule
+        if difficulty <= 2 and multiple_cities:
+            country_rule = f"You may mention the country ({next_loc.country}) but NEVER mention the city name."
+        else:
+            country_rule = "Do NOT mention the country or city name directly."
+        
+        prompt = f"""You are a witness in a family-friendly geography detective game like Carmen Sandiego.
+Generate a {difficulty_desc.get(difficulty, 'clear')} clue that hints at a destination.
+
+The suspect is heading to: {next_loc.city}, {next_loc.country} (in {next_loc.continent})
+
+RULES:
+- NEVER mention the city name "{next_loc.city}" directly
+- {country_rule}
+- Reference landmarks, culture, geography, climate, or famous features of this place
+- Keep it safe for work and appropriate for all ages
+- Write as a witness quote, 1-2 sentences max
+- Difficulty level: {difficulty}/5
+
+Generate ONLY the witness quote, nothing else."""
+
+        clue_text = self._call_ai_complete(prompt)
+        
+        return Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="destination",
+            text=clue_text or f"I heard them mention something about {next_loc.continent}...",
+            source="witness",
+        )
+    
+    def _generate_suspect_clue_with_ai(self, suspect: Suspect, difficulty: int) -> Clue:
+        """Generate a suspect clue using Cortex AI."""
+        difficulty_desc = {
+            1: "very obvious",
+            2: "clear",
+            3: "somewhat vague",
+            4: "cryptic",
+            5: "extremely cryptic"
+        }
+        
+        # Pick a random attribute to hint at
+        attributes = [
+            f"hair color: {suspect.hair_color}",
+            f"hobby: {suspect.hobby}",
+            f"vehicle: {suspect.vehicle}",
+            f"favorite food: {suspect.favorite_food}",
+        ]
+        if suspect.distinguishing_feature:
+            attributes.append(f"distinguishing feature: {suspect.distinguishing_feature}")
+        
+        chosen_attr = random.choice(attributes)
+        
+        prompt = f"""You are a witness in a family-friendly detective game.
+Generate a {difficulty_desc.get(difficulty, 'clear')} clue about a suspect you saw.
+
+The suspect has this attribute: {chosen_attr}
+
+RULES:
+- Write as a witness observation, 1 sentence
+- At difficulty 1-2, be direct about what you saw
+- At difficulty 3-4, be vague or use metaphors
+- At difficulty 5, use riddles
+- Keep it safe for work
+- Do NOT name the suspect directly
+
+Generate ONLY the witness quote, nothing else."""
+
+        clue_text = self._call_ai_complete(prompt)
+        
+        return Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="suspect",
+            text=clue_text or f"I noticed something about them... {chosen_attr.split(': ')[1]}",
+            source="witness",
+        )
+    
+    def _generate_red_herring_with_ai(self, difficulty: int) -> Clue:
+        """Generate a misleading red herring clue using Cortex AI."""
+        # Pick a random wrong location
+        all_locs = self.get_all_locations()
+        wrong_loc = random.choice(all_locs)
+        
+        prompt = f"""You are a confused or mistaken witness in a detective game.
+Generate a misleading clue that points to THE WRONG destination.
+
+Hint at: {wrong_loc.city}, {wrong_loc.country} (but this is WRONG information)
+
+RULES:
+- This is a RED HERRING - intentionally misleading
+- Make it sound believable but it's false information
+- Do NOT mention the city name directly
+- You can vaguely reference the region or landmarks
+- Keep it safe for work
+- Write as 1 confused witness quote
+
+Generate ONLY the witness quote, nothing else."""
+
+        clue_text = self._call_ai_complete(prompt)
+        
+        return Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="red_herring",
+            text=clue_text or "I think I saw them heading... somewhere with old buildings?",
+            source="confused witness",
+        )
+    
+    def _call_ai_complete(self, prompt: str) -> Optional[str]:
+        """Call Snowflake Cortex AI_COMPLETE function."""
+        try:
+            session = get_snowflake_session()
+            # Escape single quotes in prompt
+            safe_prompt = prompt.replace("'", "''")
+            
+            result = session.sql(f"""
+                SELECT AI_COMPLETE(
+                    model => 'llama3.1-8b',
+                    prompt => '{safe_prompt}',
+                    model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
+                ) as response
+            """).collect()
+            
+            if result and len(result) > 0:
+                response = result[0]['RESPONSE']
+                # Clean up response - remove quotes if present
+                if response:
+                    response = response.strip().strip('"').strip("'")
+                return response
+            return None
+        except Exception as e:
+            # Log error but don't crash - return None to use fallback
+            print(f"AI_COMPLETE error: {e}")
+            return None
     
     def attempt_arrest(self, suspect_id: str) -> Dict:
         """Attempt to arrest a suspect."""
