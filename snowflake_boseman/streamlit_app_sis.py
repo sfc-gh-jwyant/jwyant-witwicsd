@@ -709,7 +709,7 @@ Generate ONLY the witness quote, nothing else."""
         return clues
     
     def _generate_combined_clues_with_ai(self, next_loc: Location, suspect: Suspect, difficulty: int, city_name: str) -> List[Clue]:
-        """Generate both destination and suspect clues in a single AI call."""
+        """Generate a single witness quote with both destination and suspect info."""
         # Check if there are multiple cities in this country
         all_locs = self.get_all_locations()
         cities_in_country = [l for l in all_locs if l.country == next_loc.country]
@@ -741,72 +741,45 @@ Generate ONLY the witness quote, nothing else."""
         chosen_attr = random.choice(attributes)
         
         prompt = f"""You are a witness in a family-friendly geography detective game like Carmen Sandiego.
-Generate TWO separate witness quotes - one about where the suspect is heading, one about what the suspect looked like.
+Generate a SINGLE witness quote that naturally combines:
+1. A hint about where the suspect is heading
+2. A description of what the suspect looked like
 
-DESTINATION INFO (for first quote):
+EXAMPLE: "I saw someone with red hair asking about the City of Lights."
+
+DESTINATION INFO:
 - The suspect is heading to: {next_loc.city}, {next_loc.country} (in {next_loc.continent})
 - {country_rule}
-- Reference landmarks, culture, geography, climate, or famous features
+- Reference landmarks, culture, geography, climate, famous nicknames, or notable features
 - NEVER mention the city name "{next_loc.city}" directly
 
-SUSPECT INFO (for second quote):
-- The suspect has this attribute: {chosen_attr}
-- Describe what you noticed about them
+SUSPECT INFO:
+- The suspect has: {chosen_attr}
 
-DIFFICULTY: {difficulty}/5 - Make clues {difficulty_desc.get(difficulty, 'clear')}
+DIFFICULTY: {difficulty}/5 - Make the clue {difficulty_desc.get(difficulty, 'clear')}
 
 RULES:
-- Keep both quotes safe for work and family-friendly
-- Each quote should be 1-2 sentences from a witness perspective
+- Write ONE natural witness quote (1-3 sentences)
+- Combine destination hints AND suspect description naturally
+- Keep it safe for work and family-friendly
 - Do NOT name the suspect or city directly
-
-FORMAT YOUR RESPONSE EXACTLY LIKE THIS (two lines, no labels):
-[destination quote here]
-[suspect quote here]"""
+- Write ONLY the quote, nothing else"""
 
         response = self._call_ai_complete(prompt)
         
-        clues = []
+        # Fallback if AI fails
+        if not response:
+            attr_value = chosen_attr.split(': ')[1]
+            response = f"I saw someone with {attr_value} asking about traveling to {next_loc.continent}."
         
-        if response:
-            # Split response into two clues
-            lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
-            
-            if len(lines) >= 2:
-                dest_text = lines[0]
-                suspect_text = lines[1]
-            elif len(lines) == 1:
-                # AI only gave one line - use it for destination, use fallback for suspect
-                dest_text = lines[0]
-                suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
-            else:
-                # Empty response - use fallbacks
-                dest_text = f"I heard them mention something about {next_loc.continent}..."
-                suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
-        else:
-            # AI failed - use fallbacks
-            dest_text = f"I heard them mention something about {next_loc.continent}..."
-            suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
-        
-        # Create destination clue
-        clues.append(Clue(
+        # Return as a single clue
+        return [Clue(
             id=f"clue_{uuid.uuid4().hex[:8]}",
-            clue_type="destination",
-            text=dest_text,
+            clue_type="witness",
+            text=response,
             location_city=city_name,
             source="witness",
-        ))
-        
-        # Create suspect clue
-        clues.append(Clue(
-            id=f"clue_{uuid.uuid4().hex[:8]}",
-            clue_type="suspect",
-            text=suspect_text,
-            location_city=city_name,
-            source="witness",
-        ))
-        
-        return clues
+        )]
     
     def _generate_destination_clue_with_ai(self, next_loc: Location, difficulty: int, city_name: str) -> Clue:
         """Generate a destination clue using Cortex AI."""
