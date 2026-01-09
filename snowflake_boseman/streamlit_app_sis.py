@@ -306,9 +306,12 @@ class TimeManager:
 # DATABASE FUNCTIONS
 # =============================================================================
 
+@st.cache_resource
 def get_snowflake_session():
     """Get the Snowflake session."""
-    return st.connection("snowflake").session()
+    # In Streamlit in Snowflake, use the active session
+    from snowflake.snowpark.context import get_active_session
+    return get_active_session()
 
 
 def execute_query(sql: str) -> List[Dict]:
@@ -319,6 +322,7 @@ def execute_query(sql: str) -> List[Dict]:
         return [row.as_dict() for row in result]
     except Exception as e:
         st.error(f"Query error: {e}")
+        st.exception(e)
         return []
 
 
@@ -1060,6 +1064,23 @@ def main():
     )
     
     apply_theme()
+    
+    # Show title immediately so user knows app is loading
+    st.markdown("""
+    <div style="text-align: center; padding: 20px;">
+        <h1 style="color: #C4A35A;">🔍 Where in the World is Snowflake Boseman Montana? 🔍</h1>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Test database connection first
+    try:
+        session = get_snowflake_session()
+        st.success("✅ Connected to Snowflake!")
+    except Exception as e:
+        st.error(f"❌ Failed to connect to Snowflake: {e}")
+        st.exception(e)
+        st.stop()
+    
     init_session_state()
     
     controller: GameController = st.session_state.controller
@@ -1067,10 +1088,12 @@ def main():
     # Get player
     try:
         player = controller.get_or_create_player()
+        st.success(f"✅ Welcome, {player.display_name}!")
     except Exception as e:
-        st.error(f"Error connecting to database: {e}")
-        st.info("Make sure you're running this app in Snowflake with proper database access.")
-        return
+        st.error(f"Error creating player: {e}")
+        st.exception(e)
+        st.info("Make sure the database tables are created. Run deploy_standard.sql and seed_data.sql first.")
+        st.stop()
     
     # Route based on game state
     state = st.session_state.game_state
