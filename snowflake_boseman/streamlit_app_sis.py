@@ -1057,13 +1057,24 @@ Generate ONLY the witness quote, nothing else."""
 # =============================================================================
 
 def apply_theme():
-    """Apply custom CSS theme."""
+    """Apply Snowflake-branded CSS theme."""
     st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Source+Sans+Pro:wght@400;600&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    
+    /* Snowflake brand colors */
+    :root {
+        --snowflake-blue: #29B5E8;
+        --snowflake-dark: #11567F;
+        --snowflake-navy: #0D1B2A;
+        --snowflake-light: #E8F4F8;
+        --snowflake-white: #FFFFFF;
+        --snowflake-accent: #FF6B35;
+        --snowflake-gray: #6B7280;
+    }
     
     .stApp {
-        background: linear-gradient(180deg, #5C1A1A 0%, #3D2817 100%);
+        background: linear-gradient(135deg, var(--snowflake-navy) 0%, #1a3a52 50%, var(--snowflake-dark) 100%);
     }
     
     .main .block-container {
@@ -1071,59 +1082,138 @@ def apply_theme():
         max-width: 1200px;
     }
     
-    h1, h2, h3 {
-        font-family: 'Playfair Display', Georgia, serif !important;
-        color: #C4A35A !important;
+    h1, h2, h3, h4, h5, h6 {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        color: var(--snowflake-blue) !important;
+        font-weight: 600 !important;
     }
     
-    p, div, span, label {
-        font-family: 'Source Sans Pro', sans-serif !important;
+    h1 {
+        font-size: 2.5rem !important;
+        background: linear-gradient(90deg, var(--snowflake-blue), #56CCF2);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
     }
     
+    p, div, span, label, li {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        color: var(--snowflake-light) !important;
+    }
+    
+    /* Primary buttons */
     .stButton > button {
-        background: linear-gradient(180deg, #C4A35A 0%, #8B7355 100%);
-        color: #2A1810;
-        border: 2px solid #3D2817;
+        background: linear-gradient(135deg, var(--snowflake-blue) 0%, #1E88E5 100%);
+        color: white !important;
+        border: none;
         font-weight: 600;
+        font-family: 'Inter', sans-serif !important;
         border-radius: 8px;
-        padding: 0.5rem 1rem;
-        transition: all 0.2s;
+        padding: 0.6rem 1.2rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(41, 181, 232, 0.3);
     }
     
     .stButton > button:hover {
-        background: linear-gradient(180deg, #D4B86A 0%, #9B8365 100%);
-        border-color: #C4A35A;
+        background: linear-gradient(135deg, #3BC5F8 0%, #29B5E8 100%);
         transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(41, 181, 232, 0.4);
     }
     
+    .stButton > button:active {
+        transform: translateY(0);
+    }
+    
+    /* Selectbox styling */
     .stSelectbox > div > div {
-        background: #D4B896;
-        color: #2A1810;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(41, 181, 232, 0.3);
+        border-radius: 8px;
+        color: white;
+    }
+    
+    .stSelectbox > div > div:hover {
+        border-color: var(--snowflake-blue);
+    }
+    
+    /* Metrics */
+    [data-testid="stMetricValue"] {
+        color: var(--snowflake-blue) !important;
+        font-weight: 700 !important;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        color: var(--snowflake-light) !important;
+    }
+    
+    /* Info/Warning/Error boxes */
+    .stAlert {
+        background: rgba(41, 181, 232, 0.1);
+        border: 1px solid rgba(41, 181, 232, 0.3);
+        border-radius: 8px;
+    }
+    
+    /* Dividers */
+    hr {
+        border-color: rgba(41, 181, 232, 0.2) !important;
+    }
+    
+    /* Captions */
+    .stCaption, small {
+        color: var(--snowflake-gray) !important;
+    }
+    
+    /* Cards/containers */
+    [data-testid="stExpander"] {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(41, 181, 232, 0.2);
+        border-radius: 8px;
+    }
+    
+    /* Text inputs */
+    .stTextInput > div > div > input {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(41, 181, 232, 0.3);
+        border-radius: 8px;
+        color: white;
+    }
+    
+    /* Snowflake logo accent bar */
+    .main::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--snowflake-blue), #56CCF2, var(--snowflake-blue));
+        z-index: 1000;
     }
     </style>
     """, unsafe_allow_html=True)
 
 
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
-    """Render a placeholder for missing art."""
+    """Render a placeholder for missing art with Snowflake styling."""
     st.markdown(f"""
     <div style="
         width: {width}px;
         height: {height}px;
-        background: linear-gradient(135deg, #3D2817 0%, #5C1A1A 100%);
-        border: 2px dashed #C4A35A;
+        background: linear-gradient(135deg, rgba(17, 86, 127, 0.5) 0%, rgba(13, 27, 42, 0.8) 100%);
+        border: 2px dashed rgba(41, 181, 232, 0.5);
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
-        color: #C4A35A;
-        font-family: 'Source Sans Pro', sans-serif;
-        border-radius: 8px;
+        color: #29B5E8;
+        font-family: 'Inter', -apple-system, sans-serif;
+        border-radius: 12px;
         margin: 10px auto;
+        box-shadow: 0 4px 20px rgba(41, 181, 232, 0.1);
     ">
         <span style="font-size: 2em;">🖼️</span>
-        <span style="font-size: 0.8em; margin-top: 8px;">{art_type.upper()}</span>
-        <span style="font-size: 0.7em; opacity: 0.7;">{alt_text}</span>
+        <span style="font-size: 0.8em; margin-top: 8px; font-weight: 600;">{art_type.upper()}</span>
+        <span style="font-size: 0.7em; opacity: 0.7; color: #E8F4F8;">{alt_text}</span>
     </div>
     """, unsafe_allow_html=True)
 
