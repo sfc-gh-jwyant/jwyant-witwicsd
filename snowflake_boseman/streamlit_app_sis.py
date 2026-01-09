@@ -22,19 +22,9 @@ from datetime import datetime
 # =============================================================================
 
 # Database and Schema Configuration
-# Set these to use explicit fully-qualified table names
-# Set to None to use the session's default context
-DATABASE_NAME = "DEMO_WITWISBM"  # Set to None to use session default
-SCHEMA_NAME = "GAME"             # Set to None to use session default
-
-
-def get_table_name(table: str) -> str:
-    """Get fully qualified table name if database/schema are configured."""
-    if DATABASE_NAME and SCHEMA_NAME:
-        return f"{DATABASE_NAME}.{SCHEMA_NAME}.{table}"
-    elif SCHEMA_NAME:
-        return f"{SCHEMA_NAME}.{table}"
-    return table
+# Set TABLE_PREFIX to use explicit fully-qualified table names
+# Set to empty string "" to use the session's default context
+TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
 
 DIFFICULTY_CONFIG = {
@@ -388,13 +378,13 @@ class GameController:
         user_info = get_current_user()
         player_id = user_info["username"]
         
-        rows = execute_query(f"SELECT * FROM {get_table_name('players')} WHERE player_id = '{player_id}'")
+        rows = execute_query(f"SELECT * FROM {TABLE_PREFIX}players WHERE player_id = '{player_id}'")
         
         if rows:
             self._current_player = Player.from_dict(rows[0])
         else:
             execute_write(f"""
-                INSERT INTO {get_table_name('players')} (player_id, snowflake_user, rank, cases_solved, total_score)
+                INSERT INTO {TABLE_PREFIX}players (player_id, snowflake_user, rank, cases_solved, total_score)
                 VALUES ('{player_id}', '{player_id}', 'Rookie', 0, 0)
             """)
             self._current_player = Player(
@@ -412,7 +402,7 @@ class GameController:
         if self._locations_cache:
             return self._locations_cache
         
-        rows = execute_query(f"SELECT * FROM {get_table_name('locations')}")
+        rows = execute_query(f"SELECT * FROM {TABLE_PREFIX}locations")
         self._locations_cache = [
             Location(
                 id=r.get("LOCATION_ID", r.get("location_id", "")),
@@ -441,7 +431,7 @@ class GameController:
         if self._suspects_cache:
             return self._suspects_cache
         
-        rows = execute_query(f"SELECT * FROM {get_table_name('suspects')}")
+        rows = execute_query(f"SELECT * FROM {TABLE_PREFIX}suspects")
         self._suspects_cache = [Suspect.from_dict(r) for r in rows]
         return self._suspects_cache
     
