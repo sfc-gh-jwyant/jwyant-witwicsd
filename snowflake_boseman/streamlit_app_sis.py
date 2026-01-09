@@ -9,6 +9,8 @@ SINGLE FILE VERSION FOR STREAMLIT IN SNOWFLAKE
 """
 
 import streamlit as st
+import pandas as pd
+import pydeck as pdk
 from dataclasses import dataclass, field
 from typing import List, Optional, Dict, Any
 from enum import Enum
@@ -1320,8 +1322,6 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         st.subheader("🗺️ Select a Destination")
         
         # Build map data with pydeck for labels
-        import pandas as pd
-        import pydeck as pdk
         
         # Current location data
         current_df = pd.DataFrame([{
