@@ -1076,12 +1076,19 @@ def main():
     
     # Route based on game state
     state = st.session_state.game_state
-    st.write(f"✅ Game state: {state.value}")
+    st.write(f"✅ Game state: {state}")
+    st.write(f"✅ Game state type: {type(state)}")
+    st.write(f"✅ Expected: {GameState.MAIN_MENU}")
+    st.write(f"✅ Match check: {state == GameState.MAIN_MENU}")
     
     if state == GameState.MAIN_MENU:
+        st.write("📋 Entering main menu...")
         try:
             has_case = controller.get_current_case() is not None
+            st.write(f"📋 Has case: {has_case}")
+            st.write("📋 About to render menu...")
             result = render_main_menu(player, has_case)
+            st.write(f"📋 Menu rendered, result: {result}")
             
             if result["action"] == "new_case":
                 try:
