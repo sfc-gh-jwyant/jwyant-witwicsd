@@ -152,7 +152,7 @@ class Suspect:
 class Clue:
     """A clue discovered during investigation."""
     id: str
-    clue_type: str  # "destination", "suspect", "red_herring"
+    clue_type: str  # "destination", "suspect", "red_herring", "confusion"
     text: str
     difficulty_min: int = 1
     source: str = "witness"
@@ -582,14 +582,75 @@ class GameController:
         
         case.progress.hours_remaining = self._time_manager.hours_remaining
         
-        # Generate clues
-        next_location_id = case.get_suspect_next_location()
-        next_location = self.get_location_by_id(next_location_id) if next_location_id else None
+        # Check if player is on the correct path
+        is_on_path = current.id in case.location_path
         
-        clues = self._generate_clues(case, current, next_location)
+        if is_on_path:
+            # Generate real clues - player is on the right track
+            next_location_id = case.get_suspect_next_location()
+            next_location = self.get_location_by_id(next_location_id) if next_location_id else None
+            clues = self._generate_clues(case, current, next_location)
+        else:
+            # Generate confusion statements - player is at the wrong city
+            clues = self._generate_confusion_statements(case, current)
+        
         case.progress.clues_gathered.extend(clues)
         
         return clues
+    
+    def _generate_confusion_statements(self, case: Case, current: Location) -> List[Clue]:
+        """Generate confusion statements when player is at the wrong location."""
+        statements = []
+        
+        # Generate 1-2 confusion statements
+        num_statements = random.randint(1, 2)
+        
+        for i in range(num_statements):
+            statement = self._generate_confusion_with_ai(case.suspect, current)
+            statements.append(statement)
+        
+        return statements
+    
+    def _generate_confusion_with_ai(self, suspect: Suspect, current: Location) -> Clue:
+        """Generate a confusion statement using Cortex AI."""
+        prompt = f"""You are a local witness in {current.city}, {current.country} for a detective game.
+The detective is looking for a suspect, but the suspect was NEVER HERE - the detective is in the wrong city!
+
+Generate a confused or unhelpful witness statement indicating you haven't seen anyone matching the description.
+
+Examples of what to say:
+- "I haven't seen anyone suspicious around here."
+- "No one like that has come through town recently."
+- "Are you sure you're in the right place? It's been quiet here."
+- "I've been here all day and haven't noticed anyone unusual."
+- "Maybe try asking in another city?"
+
+RULES:
+- Indicate you haven't seen the suspect
+- Be polite but unhelpful
+- Maybe suggest they're in the wrong place
+- Keep it safe for work
+- 1 sentence only
+
+Generate ONLY the witness quote, nothing else."""
+
+        statement_text = self._call_ai_complete(prompt)
+        
+        # Fallback statements if AI fails
+        fallback_statements = [
+            "I haven't seen anyone matching that description around here.",
+            "No suspicious characters have come through lately. Are you sure you're in the right city?",
+            "It's been pretty quiet here. Maybe try somewhere else?",
+            "Sorry, I can't help you. No one like that has been here.",
+            "I've been watching the streets all day - no one unusual passed by.",
+        ]
+        
+        return Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="confusion",
+            text=statement_text or random.choice(fallback_statements),
+            source="confused local",
+        )
     
     def _generate_clues(self, case: Case, current: Location, next_loc: Optional[Location]) -> List[Clue]:
         """Generate clues for investigation using Cortex AI."""
@@ -1005,8 +1066,15 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         clues = controller.get_gathered_clues()
         if clues:
             for clue in clues[-5:]:  # Show last 5 clues
-                icon = "🌍" if clue.clue_type == "destination" else "🔎"
-                st.info(f"{icon} {clue.text}")
+                if clue.clue_type == "confusion":
+                    # Wrong city - witness has no info
+                    st.warning(f"🤷 {clue.text}")
+                elif clue.clue_type == "destination":
+                    st.info(f"🌍 {clue.text}")
+                elif clue.clue_type == "red_herring":
+                    st.info(f"❓ {clue.text}")
+                else:
+                    st.info(f"🔎 {clue.text}")
         else:
             st.info("No clues yet. Investigate to gather clues!")
     
