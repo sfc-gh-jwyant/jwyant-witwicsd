@@ -26,6 +26,34 @@ from datetime import datetime
 # Set to empty string "" to use the session's default context
 TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
+# Available AI models for Snowflake Cortex AI_COMPLETE
+# See: https://docs.snowflake.com/en/sql-reference/functions/ai_complete-single-string#arguments
+AVAILABLE_AI_MODELS = [
+    "llama3.1-70b",      # Default
+    "llama3.1-8b",
+    "llama3.1-405b",
+    "llama3.3-70b",
+    "llama3-8b",
+    "llama3-70b",
+    "llama4-maverick",
+    "llama4-scout",
+    "claude-4-opus",
+    "claude-4-sonnet",
+    "claude-3-7-sonnet",
+    "claude-3-5-sonnet",
+    "deepseek-r1",
+    "mistral-large",
+    "mistral-large2",
+    "mistral-7b",
+    "mixtral-8x7b",
+    "openai-gpt-4.1",
+    "openai-o4-mini",
+    "snowflake-arctic",
+    "snowflake-llama-3.1-405b",
+    "snowflake-llama-3.3-70b",
+]
+DEFAULT_AI_MODEL = "llama3.1-70b"
+
 
 DIFFICULTY_CONFIG = {
     1: {
@@ -710,7 +738,7 @@ RULES:
 - {country_rule}
 - Reference landmarks, culture, geography, climate, or famous features of this place
 - Keep it safe for work and appropriate for all ages
-- Write as a witness quote, 1-2 sentences max
+- Write as a witness quote, 2-3 sentences max
 - Difficulty level: {difficulty}/5
 
 Generate ONLY the witness quote, nothing else."""
@@ -810,9 +838,12 @@ Generate ONLY the witness quote, nothing else."""
             # Escape single quotes in prompt
             safe_prompt = prompt.replace("'", "''")
             
+            # Get selected model from session state
+            model = st.session_state.get("ai_model", DEFAULT_AI_MODEL)
+            
             result = session.sql(f"""
                 SELECT AI_COMPLETE(
-                    model => 'llama3.1-70b',
+                    model => '{model}',
                     prompt => '{safe_prompt}',
                     model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
                 ) as response
@@ -1084,20 +1115,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
                 st.markdown(f"**{city}:**")
                 for clue in city_clues:
                     # Clean up any escaped or extra quotes from AI response
-                    clean_text = clue.text
-                    # Replace escaped quotes (both escape sequences and literal backslash+quote)
-                    clean_text = clean_text.replace('\\\"', '"').replace("\\'", "'")
-                    clean_text = clean_text.replace('\\"', '"').replace("\\\"", '"')
-                    clean_text = clean_text.replace('\\', '')  # Remove any remaining backslashes
-                    # Strip whitespace
-                    clean_text = clean_text.strip()
-                    # Remove all leading quotes (handles "", ", etc.)
-                    while clean_text and (clean_text.startswith('"') or clean_text.startswith("'")):
-                        clean_text = clean_text[1:]
-                    # Remove all trailing quotes
-                    while clean_text and (clean_text.endswith('"') or clean_text.endswith("'")):
-                        clean_text = clean_text[:-1]
-                    clean_text = clean_text.strip()
+                    clean_text = clue.text.strip('"\\')
                     st.text(f'"{clean_text}"')
         else:
             st.info("No clues yet. Investigate to gather clues!")
@@ -1272,6 +1290,9 @@ def init_session_state():
     if "case_result" not in st.session_state:
         st.session_state.case_result = None
     
+    if "ai_model" not in st.session_state:
+        st.session_state.ai_model = DEFAULT_AI_MODEL
+    
     # Restore case to controller from session state
     controller = st.session_state.controller
     if st.session_state.current_case and not controller._current_case:
@@ -1293,6 +1314,19 @@ def main():
     
     apply_theme()
     init_session_state()
+    
+    # AI Model selector in sidebar
+    with st.sidebar:
+        st.subheader("⚙️ Settings")
+        selected_model = st.selectbox(
+            "AI Model",
+            options=AVAILABLE_AI_MODELS,
+            index=AVAILABLE_AI_MODELS.index(st.session_state.ai_model),
+            help="Select the Snowflake Cortex AI model for generating clues"
+        )
+        if selected_model != st.session_state.ai_model:
+            st.session_state.ai_model = selected_model
+        st.caption(f"Using: **{st.session_state.ai_model}**")
     
     controller: GameController = st.session_state.controller
     
