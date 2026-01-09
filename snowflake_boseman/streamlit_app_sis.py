@@ -385,9 +385,9 @@ def get_current_user() -> Dict[str, str]:
     """Get current Snowflake user info."""
     try:
         # In Streamlit in Snowflake, try to get the actual logged-in user
-        # st.experimental_user contains the SSO/login identity
-        if hasattr(st, 'experimental_user') and st.experimental_user:
-            user_info = st.experimental_user
+        # st.user contains the SSO/login identity
+        if hasattr(st, 'user') and st.user:
+            user_info = st.user
             # user_info may have 'email' or 'user_name' depending on auth setup
             username = user_info.get('email') or user_info.get('user_name') or user_info.get('name', '')
             if username:
