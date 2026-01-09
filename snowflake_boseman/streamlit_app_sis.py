@@ -689,20 +689,122 @@ Generate ONLY the witness quote, nothing else."""
         config = DIFFICULTY_CONFIG[difficulty]
         city_name = current.city
         
-        # Destination clue
+        # Generate destination + suspect clues in one AI call
         if next_loc:
-            dest_clue = self._generate_destination_clue_with_ai(next_loc, difficulty, city_name)
-            clues.append(dest_clue)
-        
-        # Suspect clue
-        suspect_clue = self._generate_suspect_clue_with_ai(case.suspect, difficulty, city_name)
-        clues.append(suspect_clue)
+            combined_clues = self._generate_combined_clues_with_ai(
+                next_loc, case.suspect, difficulty, city_name
+            )
+            clues.extend(combined_clues)
+        else:
+            # No next location (end of path) - just generate suspect clue
+            suspect_clue = self._generate_suspect_clue_with_ai(case.suspect, difficulty, city_name)
+            clues.append(suspect_clue)
         
         # Add red herrings based on difficulty
         num_red_herrings = config.get("red_herrings", 0)
         if num_red_herrings > 0 and random.random() < 0.5:  # 50% chance per investigation
             red_herring = self._generate_red_herring_with_ai(difficulty, city_name)
             clues.append(red_herring)
+        
+        return clues
+    
+    def _generate_combined_clues_with_ai(self, next_loc: Location, suspect: Suspect, difficulty: int, city_name: str) -> List[Clue]:
+        """Generate both destination and suspect clues in a single AI call."""
+        # Check if there are multiple cities in this country
+        all_locs = self.get_all_locations()
+        cities_in_country = [l for l in all_locs if l.country == next_loc.country]
+        multiple_cities = len(cities_in_country) > 1
+        
+        difficulty_desc = {
+            1: "very obvious and easy to understand",
+            2: "clear but not too direct",
+            3: "somewhat cryptic, requiring some thought",
+            4: "cryptic and puzzle-like",
+            5: "extremely cryptic, like a riddle"
+        }
+        
+        # Country naming rule
+        if difficulty <= 2 and multiple_cities:
+            country_rule = f"You may mention the country ({next_loc.country}) but NEVER mention the city name."
+        else:
+            country_rule = "Do NOT mention the country or city name directly."
+        
+        # Pick a random suspect attribute to hint at
+        attributes = [
+            f"hair color: {suspect.hair_color}",
+            f"hobby: {suspect.hobby}",
+            f"vehicle: {suspect.vehicle}",
+            f"favorite food: {suspect.favorite_food}",
+        ]
+        if suspect.distinguishing_feature:
+            attributes.append(f"distinguishing feature: {suspect.distinguishing_feature}")
+        chosen_attr = random.choice(attributes)
+        
+        prompt = f"""You are a witness in a family-friendly geography detective game like Carmen Sandiego.
+Generate TWO separate witness quotes - one about where the suspect is heading, one about what the suspect looked like.
+
+DESTINATION INFO (for first quote):
+- The suspect is heading to: {next_loc.city}, {next_loc.country} (in {next_loc.continent})
+- {country_rule}
+- Reference landmarks, culture, geography, climate, or famous features
+- NEVER mention the city name "{next_loc.city}" directly
+
+SUSPECT INFO (for second quote):
+- The suspect has this attribute: {chosen_attr}
+- Describe what you noticed about them
+
+DIFFICULTY: {difficulty}/5 - Make clues {difficulty_desc.get(difficulty, 'clear')}
+
+RULES:
+- Keep both quotes safe for work and family-friendly
+- Each quote should be 1-2 sentences from a witness perspective
+- Do NOT name the suspect or city directly
+
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS (two lines, no labels):
+[destination quote here]
+[suspect quote here]"""
+
+        response = self._call_ai_complete(prompt)
+        
+        clues = []
+        
+        if response:
+            # Split response into two clues
+            lines = [line.strip() for line in response.strip().split('\n') if line.strip()]
+            
+            if len(lines) >= 2:
+                dest_text = lines[0]
+                suspect_text = lines[1]
+            elif len(lines) == 1:
+                # AI only gave one line - use it for destination, use fallback for suspect
+                dest_text = lines[0]
+                suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
+            else:
+                # Empty response - use fallbacks
+                dest_text = f"I heard them mention something about {next_loc.continent}..."
+                suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
+        else:
+            # AI failed - use fallbacks
+            dest_text = f"I heard them mention something about {next_loc.continent}..."
+            suspect_text = f"I noticed something about them... {chosen_attr.split(': ')[1]}"
+        
+        # Create destination clue
+        clues.append(Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="destination",
+            text=dest_text,
+            location_city=city_name,
+            source="witness",
+        ))
+        
+        # Create suspect clue
+        clues.append(Clue(
+            id=f"clue_{uuid.uuid4().hex[:8]}",
+            clue_type="suspect",
+            text=suspect_text,
+            location_city=city_name,
+            source="witness",
+        ))
         
         return clues
     
