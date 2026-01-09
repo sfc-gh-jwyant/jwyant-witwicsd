@@ -1017,8 +1017,20 @@ def init_session_state():
     if "controller" not in st.session_state:
         st.session_state.controller = GameController()
     
+    if "current_case" not in st.session_state:
+        st.session_state.current_case = None
+    
+    if "time_manager" not in st.session_state:
+        st.session_state.time_manager = None
+    
     if "case_result" not in st.session_state:
         st.session_state.case_result = None
+    
+    # Restore case to controller from session state
+    controller = st.session_state.controller
+    if st.session_state.current_case and not controller._current_case:
+        controller._current_case = st.session_state.current_case
+        controller._time_manager = st.session_state.time_manager
 
 
 def main():
@@ -1054,9 +1066,16 @@ def main():
             result = render_main_menu(player, has_case)
             
             if result["action"] == "new_case":
-                controller.start_new_case(result.get("difficulty", 1))
-                st.session_state.game_state = GameState.INVESTIGATION
-                st.rerun()
+                try:
+                    case = controller.start_new_case(result.get("difficulty", 1))
+                    # Store in session state for persistence
+                    st.session_state.current_case = case
+                    st.session_state.time_manager = controller._time_manager
+                    st.session_state.game_state = GameState.INVESTIGATION
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error starting new case: {e}")
+                    st.exception(e)
             elif result["action"] == "continue":
                 st.session_state.game_state = GameState.INVESTIGATION
                 st.rerun()
@@ -1065,20 +1084,33 @@ def main():
             st.exception(e)
     
     elif state == GameState.INVESTIGATION:
-        case = controller.get_current_case()
-        location = controller.get_current_location()
-        
-        if not case or not location:
-            st.session_state.game_state = GameState.MAIN_MENU
-            st.rerun()
+        try:
+            case = controller.get_current_case()
+            location = controller.get_current_location()
+            
+            if not case or not location:
+                st.warning("No active case found. Returning to main menu.")
+                st.session_state.game_state = GameState.MAIN_MENU
+                st.session_state.current_case = None
+                st.session_state.time_manager = None
+                st.rerun()
+                return
+            
+            result = render_investigation(controller, case, location, player)
+        except Exception as e:
+            st.error(f"Error in investigation: {e}")
+            st.exception(e)
+            if st.button("Return to Main Menu"):
+                st.session_state.game_state = GameState.MAIN_MENU
+                st.rerun()
             return
-        
-        result = render_investigation(controller, case, location, player)
         
         if result["action"] == "investigate":
             clues = controller.investigate()
-            if clues:
-                st.success(f"Found {len(clues)} clue(s)!")
+            # Update session state with modified case
+            st.session_state.current_case = controller._current_case
+            st.session_state.time_manager = controller._time_manager
+            
             if controller.get_time_remaining() <= 0:
                 st.session_state.case_result = {
                     "won": False,
@@ -1118,6 +1150,10 @@ def main():
         elif result["action"] == "travel_to":
             travel_result = controller.travel_to(result["destination_id"])
             
+            # Update session state with modified case
+            st.session_state.current_case = controller._current_case
+            st.session_state.time_manager = controller._time_manager
+            
             if travel_result.get("game_over"):
                 st.session_state.case_result = {
                     "won": False,
@@ -1126,9 +1162,6 @@ def main():
                 }
                 st.session_state.game_state = GameState.CASE_RESULT
             else:
-                st.success(travel_result.get("message", "Traveled!"))
-                if travel_result.get("arrived_at_suspect"):
-                    st.info("🎯 The suspect is here!")
                 st.session_state.game_state = GameState.INVESTIGATION
             st.rerun()
     
