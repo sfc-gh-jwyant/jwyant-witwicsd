@@ -384,14 +384,39 @@ def execute_write(sql: str) -> bool:
 def get_current_user() -> Dict[str, str]:
     """Get current Snowflake user info."""
     try:
+        # In Streamlit in Snowflake, try to get the actual logged-in user
+        # st.experimental_user contains the SSO/login identity
+        if hasattr(st, 'experimental_user') and st.experimental_user:
+            user_info = st.experimental_user
+            # user_info may have 'email' or 'user_name' depending on auth setup
+            username = user_info.get('email') or user_info.get('user_name') or user_info.get('name', '')
+            if username:
+                return {"username": username, "role": "USER"}
+        
+        # Fallback: Try CURRENT_USER() but it may return service account in SiS
         session = get_snowflake_session()
         result = session.sql("""
             SELECT CURRENT_USER() as username, 
                    CURRENT_ROLE() as role
         """).collect()[0]
-        return {"username": result["USERNAME"], "role": result["ROLE"]}
-    except Exception:
-        return {"username": "demo_user", "role": "PUBLIC"}
+        
+        username = result["USERNAME"]
+        
+        # Check if it looks like a service account (contains random numbers)
+        # If so, try to get a better name
+        if username and len(username) > 20 and username.upper().startswith("STPLAT"):
+            # This is a Streamlit platform service account, use a friendlier name
+            # Try to get email from session context
+            try:
+                email_result = session.sql("SELECT SYSTEM$GET_SNOWFLAKE_PLATFORM_INFO() as info").collect()
+                # Parse if available, otherwise fall back
+            except:
+                pass
+            return {"username": "Detective", "role": result["ROLE"]}
+        
+        return {"username": username, "role": result["ROLE"]}
+    except Exception as e:
+        return {"username": "Detective", "role": "PUBLIC"}
 
 
 # =============================================================================
