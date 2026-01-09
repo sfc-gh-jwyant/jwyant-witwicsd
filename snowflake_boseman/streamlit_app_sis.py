@@ -1040,16 +1040,31 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     
     st.subheader("🆕 Start New Case")
     
-    # Difficulty selector
-    difficulty = st.selectbox(
-        "Select Difficulty",
-        options=[1, 2, 3, 4, 5],
-        format_func=lambda x: f"{DIFFICULTY_CONFIG[x]['name']} - {DIFFICULTY_CONFIG[x]['description']}",
-    )
+    col_diff, col_model = st.columns(2)
+    
+    with col_diff:
+        # Difficulty selector
+        difficulty = st.selectbox(
+            "Select Difficulty",
+            options=[1, 2, 3, 4, 5],
+            format_func=lambda x: f"{DIFFICULTY_CONFIG[x]['name']} - {DIFFICULTY_CONFIG[x]['description']}",
+        )
+    
+    with col_model:
+        # AI Model selector
+        ai_model = st.selectbox(
+            "AI Model",
+            options=AVAILABLE_AI_MODELS,
+            index=AVAILABLE_AI_MODELS.index(st.session_state.ai_model),
+            help="Snowflake Cortex AI model for generating clues"
+        )
+        # Update session state when model changes
+        if ai_model != st.session_state.ai_model:
+            st.session_state.ai_model = ai_model
     
     # Show difficulty details
     config = DIFFICULTY_CONFIG[difficulty]
-    st.caption(f"⏱️ Time: {config['time_budget']} hours | 📍 Locations: {config['min_locations']}-{config['max_locations']} | 🔴 Red Herrings: {config['red_herrings']}")
+    st.caption(f"⏱️ Time: {config['time_budget']} hours | 📍 Locations: {config['min_locations']}-{config['max_locations']} | 🔴 Red Herrings: {config['red_herrings']} | 🤖 Model: {ai_model}")
     
     if st.button("🔍 START NEW CASE", use_container_width=True, type="primary"):
         result = {"action": "new_case", "difficulty": difficulty}
@@ -1314,19 +1329,6 @@ def main():
     
     apply_theme()
     init_session_state()
-    
-    # AI Model selector in sidebar
-    with st.sidebar:
-        st.subheader("⚙️ Settings")
-        selected_model = st.selectbox(
-            "AI Model",
-            options=AVAILABLE_AI_MODELS,
-            index=AVAILABLE_AI_MODELS.index(st.session_state.ai_model),
-            help="Select the Snowflake Cortex AI model for generating clues"
-        )
-        if selected_model != st.session_state.ai_model:
-            st.session_state.ai_model = selected_model
-        st.caption(f"Using: **{st.session_state.ai_model}**")
     
     controller: GameController = st.session_state.controller
     
