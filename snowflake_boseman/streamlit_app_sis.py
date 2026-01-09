@@ -154,6 +154,7 @@ class Clue:
     id: str
     clue_type: str  # "destination", "suspect", "red_herring", "confusion"
     text: str
+    location_city: str = ""  # City where clue was gathered
     difficulty_min: int = 1
     source: str = "witness"
 
@@ -649,6 +650,7 @@ Generate ONLY the witness quote, nothing else."""
             id=f"clue_{uuid.uuid4().hex[:8]}",
             clue_type="confusion",
             text=statement_text or random.choice(fallback_statements),
+            location_city=current.city,
             source="confused local",
         )
     
@@ -657,25 +659,26 @@ Generate ONLY the witness quote, nothing else."""
         clues = []
         difficulty = case.difficulty
         config = DIFFICULTY_CONFIG[difficulty]
+        city_name = current.city
         
         # Destination clue
         if next_loc:
-            dest_clue = self._generate_destination_clue_with_ai(next_loc, difficulty)
+            dest_clue = self._generate_destination_clue_with_ai(next_loc, difficulty, city_name)
             clues.append(dest_clue)
         
         # Suspect clue
-        suspect_clue = self._generate_suspect_clue_with_ai(case.suspect, difficulty)
+        suspect_clue = self._generate_suspect_clue_with_ai(case.suspect, difficulty, city_name)
         clues.append(suspect_clue)
         
         # Add red herrings based on difficulty
         num_red_herrings = config.get("red_herrings", 0)
         if num_red_herrings > 0 and random.random() < 0.5:  # 50% chance per investigation
-            red_herring = self._generate_red_herring_with_ai(difficulty)
+            red_herring = self._generate_red_herring_with_ai(difficulty, city_name)
             clues.append(red_herring)
         
         return clues
     
-    def _generate_destination_clue_with_ai(self, next_loc: Location, difficulty: int) -> Clue:
+    def _generate_destination_clue_with_ai(self, next_loc: Location, difficulty: int, city_name: str) -> Clue:
         """Generate a destination clue using Cortex AI."""
         # Check if there are multiple cities in this country
         all_locs = self.get_all_locations()
@@ -718,10 +721,11 @@ Generate ONLY the witness quote, nothing else."""
             id=f"clue_{uuid.uuid4().hex[:8]}",
             clue_type="destination",
             text=clue_text or f"I heard them mention something about {next_loc.continent}...",
+            location_city=city_name,
             source="witness",
         )
     
-    def _generate_suspect_clue_with_ai(self, suspect: Suspect, difficulty: int) -> Clue:
+    def _generate_suspect_clue_with_ai(self, suspect: Suspect, difficulty: int, city_name: str) -> Clue:
         """Generate a suspect clue using Cortex AI."""
         difficulty_desc = {
             1: "very obvious",
@@ -764,10 +768,11 @@ Generate ONLY the witness quote, nothing else."""
             id=f"clue_{uuid.uuid4().hex[:8]}",
             clue_type="suspect",
             text=clue_text or f"I noticed something about them... {chosen_attr.split(': ')[1]}",
+            location_city=city_name,
             source="witness",
         )
     
-    def _generate_red_herring_with_ai(self, difficulty: int) -> Clue:
+    def _generate_red_herring_with_ai(self, difficulty: int, city_name: str) -> Clue:
         """Generate a misleading red herring clue using Cortex AI."""
         # Pick a random wrong location
         all_locs = self.get_all_locations()
@@ -794,6 +799,7 @@ Generate ONLY the witness quote, nothing else."""
             id=f"clue_{uuid.uuid4().hex[:8]}",
             clue_type="red_herring",
             text=clue_text or "I think I saw them heading... somewhere with old buildings?",
+            location_city=city_name,
             source="confused witness",
         )
     
@@ -1065,16 +1071,19 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         
         clues = controller.get_gathered_clues()
         if clues:
-            for clue in clues[-5:]:  # Show last 5 clues
-                if clue.clue_type == "confusion":
-                    # Wrong city - witness has no info
-                    st.warning(f"🤷 {clue.text}")
-                elif clue.clue_type == "destination":
-                    st.info(f"🌍 {clue.text}")
-                elif clue.clue_type == "red_herring":
-                    st.info(f"❓ {clue.text}")
-                else:
-                    st.info(f"🔎 {clue.text}")
+            # Group clues by city
+            clues_by_city = {}
+            for clue in clues:
+                city = clue.location_city or "Unknown"
+                if city not in clues_by_city:
+                    clues_by_city[city] = []
+                clues_by_city[city].append(clue)
+            
+            # Display clues grouped by city
+            for city, city_clues in clues_by_city.items():
+                st.markdown(f"**{city}:**")
+                for clue in city_clues:
+                    st.text(f'"{clue.text}"')
         else:
             st.info("No clues yet. Investigate to gather clues!")
     
