@@ -1045,50 +1045,28 @@ def main():
     except:
         pass  # Already set
     
-    # Show something immediately
-    st.write("🔍 Loading game...")
-    
-    try:
-        apply_theme()
-        st.write("✅ Theme applied")
-    except Exception as e:
-        st.error(f"Theme error: {e}")
-    
-    try:
-        init_session_state()
-        st.write("✅ Session state initialized")
-    except Exception as e:
-        st.error(f"Session state error: {e}")
-        st.exception(e)
-        st.stop()
+    apply_theme()
+    init_session_state()
     
     controller: GameController = st.session_state.controller
     
     # Get player
     try:
         player = controller.get_or_create_player()
-        st.write(f"✅ Player loaded: {player.display_name}")
     except Exception as e:
         st.error(f"❌ Error connecting to database: {e}")
         st.info("Make sure the database tables are created. Run deploy_standard.sql and seed_data.sql first.")
         st.exception(e)
         st.stop()
     
-    # Route based on game state
+    # Route based on game state (compare by .value to avoid enum class mismatch on rerun)
     state = st.session_state.game_state
-    st.write(f"✅ Game state: {state}")
-    st.write(f"✅ Game state type: {type(state)}")
-    st.write(f"✅ Expected: {GameState.MAIN_MENU}")
-    st.write(f"✅ Match check: {state == GameState.MAIN_MENU}")
+    state_value = state.value if hasattr(state, 'value') else state
     
-    if state == GameState.MAIN_MENU:
-        st.write("📋 Entering main menu...")
+    if state_value == GameState.MAIN_MENU.value:
         try:
             has_case = controller.get_current_case() is not None
-            st.write(f"📋 Has case: {has_case}")
-            st.write("📋 About to render menu...")
             result = render_main_menu(player, has_case)
-            st.write(f"📋 Menu rendered, result: {result}")
             
             if result["action"] == "new_case":
                 try:
@@ -1108,7 +1086,7 @@ def main():
             st.error(f"Error in main menu: {e}")
             st.exception(e)
     
-    elif state == GameState.INVESTIGATION:
+    elif state_value == GameState.INVESTIGATION.value:
         try:
             case = controller.get_current_case()
             location = controller.get_current_location()
@@ -1157,7 +1135,7 @@ def main():
             st.session_state.game_state = GameState.MAIN_MENU
             st.rerun()
     
-    elif state == GameState.TRAVEL:
+    elif state_value == GameState.TRAVEL.value:
         case = controller.get_current_case()
         location = controller.get_current_location()
         
@@ -1190,7 +1168,7 @@ def main():
                 st.session_state.game_state = GameState.INVESTIGATION
             st.rerun()
     
-    elif state == GameState.ARREST:
+    elif state_value == GameState.ARREST.value:
         case = controller.get_current_case()
         
         if not case:
@@ -1218,7 +1196,7 @@ def main():
                 st.session_state.game_state = GameState.CASE_RESULT
             st.rerun()
     
-    elif state == GameState.CASE_RESULT:
+    elif state_value == GameState.CASE_RESULT.value:
         case_result = st.session_state.case_result or {}
         case = controller.get_current_case()
         
