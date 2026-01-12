@@ -28,6 +28,10 @@ from datetime import datetime
 # Set to empty string "" to use the session's default context
 TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
+# Stage for media files (city images, landmarks, etc.)
+# Images are named like "loc_paris.jpg", "loc_newyork.jpg"
+MEDIA_STAGE = "@DEMO_WITWISBM.GAME.MEDIA"  # e.g., "@DEMO_WITWISBM.GAME.MEDIA"
+
 # Available AI models for Snowflake Cortex AI_COMPLETE
 # See: https://docs.snowflake.com/en/sql-reference/functions/ai_complete-single-string#arguments
 AVAILABLE_AI_MODELS = [
@@ -1218,6 +1222,45 @@ def apply_theme():
     """, unsafe_allow_html=True)
 
 
+def render_stage_image(location_id: str, alt_text: str, use_container_width: bool = True):
+    """
+    Render an image from the Snowflake stage.
+    Images are stored as loc_[city].jpg in the MEDIA stage.
+    
+    In Streamlit in Snowflake, use st.image with the stage path.
+    """
+    try:
+        # Construct the stage file path
+        # location_id format: "loc_paris" -> file: "loc_paris.jpg"
+        image_path = f"{MEDIA_STAGE}/{location_id}.jpg"
+        
+        # In Streamlit in Snowflake, we can read from stage directly
+        session = get_snowflake_session()
+        
+        # Try to read the image from stage
+        # Using GET to read binary file content
+        try:
+            # Read image bytes from stage
+            result = session.file.get(image_path, "/tmp/")
+            local_path = f"/tmp/{location_id}.jpg"
+            st.image(local_path, caption=alt_text, use_container_width=use_container_width)
+            return True
+        except Exception:
+            # Alternative: Try using the stage URL directly
+            # Some SiS versions support direct stage URLs
+            try:
+                st.image(image_path, caption=alt_text, use_container_width=use_container_width)
+                return True
+            except:
+                pass
+    except Exception as e:
+        pass
+    
+    # Fallback to placeholder
+    render_art_placeholder("Location", alt_text)
+    return False
+
+
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
     """Render a placeholder for missing art with Snowflake styling."""
     st.markdown(f"""
@@ -1358,6 +1401,18 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     
     with col_left:
         st.subheader(f"🏙️ Welcome to {location.city}")
+        
+        # Display city image from stage
+        if location.image_url:
+            # If image_url is set, use it directly
+            try:
+                st.image(location.image_url, caption=f"{location.city}, {location.country}", use_container_width=True)
+            except:
+                render_stage_image(location.id, f"{location.city}, {location.country}")
+        else:
+            # Try to load from stage using location_id
+            render_stage_image(location.id, f"{location.city}, {location.country}")
+        
         if location.description:
             st.info(location.description)
         else:
