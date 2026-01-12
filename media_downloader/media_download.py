@@ -57,55 +57,47 @@ def download_image(title, save_path_prefix):
 
 def download_city_image(city_name, save_path_prefix):
     """
-    Download the best city image, preferring skyline/panorama views.
-    Tries multiple search terms in order of preference.
+    Download the main Wikipedia page image for the city.
+    This is typically the first/top image in the sidebar (often a skyline or iconic view).
     """
-    search_terms = [
-        f"{city_name} skyline",
-        f"{city_name} panorama", 
-        f"{city_name} cityscape",
-        city_name  # Fallback to main city page
-    ]
+    params = {
+        "action": "query",
+        "format": "json",
+        "titles": city_name,
+        "prop": "pageimages",
+        "pithumbsize": 1600,  # Larger for city backgrounds
+        "redirects": 1
+    }
     
-    for search_term in search_terms:
-        params = {
-            "action": "query",
-            "format": "json",
-            "titles": search_term,
-            "prop": "pageimages|images",
-            "pithumbsize": 1600,  # Larger for city backgrounds
-            "redirects": 1
-        }
+    try:
+        response = session.get(API_URL, params=params)
+        response.raise_for_status()
+        data = response.json()
         
-        try:
-            response = session.get(API_URL, params=params)
-            response.raise_for_status()
-            data = response.json()
-            
-            pages = data.get("query", {}).get("pages", {})
-            for pid in pages:
-                if int(pid) < 0:  # Page doesn't exist
-                    continue
+        pages = data.get("query", {}).get("pages", {})
+        for pid in pages:
+            if int(pid) < 0:  # Page doesn't exist
+                continue
+                
+            if "thumbnail" in pages[pid]:
+                img_url = pages[pid]["thumbnail"]["source"]
+                
+                # Download the image
+                img_response = session.get(img_url, stream=True)
+                img_response.raise_for_status()
+                
+                if len(img_response.content) > 0:
+                    ext = img_url.split('.')[-1].split('?')[0].lower()
+                    ext = 'jpg' if 'jpg' in ext else 'png' if 'png' in ext else ext
                     
-                if "thumbnail" in pages[pid]:
-                    img_url = pages[pid]["thumbnail"]["source"]
+                    full_path = f"{save_path_prefix}.{ext}"
                     
-                    # Download the image
-                    img_response = session.get(img_url, stream=True)
-                    img_response.raise_for_status()
-                    
-                    if len(img_response.content) > 0:
-                        ext = img_url.split('.')[-1].split('?')[0].lower()
-                        ext = 'jpg' if 'jpg' in ext else 'png' if 'png' in ext else ext
-                        
-                        full_path = f"{save_path_prefix}.{ext}"
-                        
-                        with open(full_path, 'wb') as f:
-                            f.write(img_response.content)
-                        print(f"   [✓] City image ({search_term}): {full_path} ({len(img_response.content)} bytes)")
-                        return True
-        except Exception as e:
-            continue
+                    with open(full_path, 'wb') as f:
+                        f.write(img_response.content)
+                    print(f"   [✓] City image: {full_path} ({len(img_response.content)} bytes)")
+                    return True
+    except Exception as e:
+        print(f"   [X] Failed to download city image: {e}")
     
     print(f"   [!] No city image found for: {city_name}")
     return False
