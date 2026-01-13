@@ -1231,14 +1231,12 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     """
     # Try both jpg and png extensions
     extensions = ["jpg", "png"]
+    session = get_snowflake_session()
     
     for ext in extensions:
         try:
             # Construct the stage file path
             image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
-            
-            # In Streamlit in Snowflake, we can read from stage directly
-            session = get_snowflake_session()
             
             # Try to read the image from stage using GET
             try:
@@ -1259,40 +1257,6 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     # Fallback to placeholder
     render_art_placeholder("Location", alt_text)
     return False
-
-
-def get_stage_image_url(location_id: str) -> Optional[str]:
-    """
-    Get a base64 data URL for a location image from the stage.
-    Tries both .jpg and .png extensions.
-    Returns None if image not found.
-    
-    For CSS background-image, we need a browser-accessible URL.
-    Stage paths like @STAGE/file.jpg don't work directly in CSS.
-    We read the file and convert to base64 data URL.
-    """
-    import base64
-    
-    extensions = [("jpg", "image/jpeg"), ("png", "image/png")]
-    session = get_snowflake_session()
-    
-    for ext, mime_type in extensions:
-        try:
-            image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
-            local_path = f"/tmp/{location_id}.{ext}"
-            
-            # Try to download from stage
-            session.file.get(image_path, "/tmp/")
-            
-            # Read and encode as base64
-            with open(local_path, "rb") as f:
-                image_bytes = f.read()
-                b64_string = base64.b64encode(image_bytes).decode("utf-8")
-                return f"data:{mime_type};base64,{b64_string}"
-        except Exception:
-            continue
-    
-    return None
 
 
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
@@ -1398,77 +1362,8 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
 
 
 def render_investigation(controller: GameController, case: Case, location: Location, player: Player) -> Dict:
-    """Render investigation screen with city background image."""
+    """Render investigation screen."""
     result = {"action": None}
-    
-    # Get the background image URL
-    bg_image_url = location.image_url
-    if not bg_image_url:
-        # Construct stage URL - try to get from stage (could be .jpg or .png)
-        bg_image_url = get_stage_image_url(location.id)
-    
-    # Apply background image CSS with semi-transparent overlay containers
-    st.markdown(f"""
-    <style>
-    /* Background image for investigation screen */
-    .investigation-bg {{
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: url('{bg_image_url}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        z-index: -1;
-        opacity: 0.3;
-    }}
-    
-    /* Semi-transparent container boxes (50% opacity) */
-    .transparent-box {{
-        background: rgba(13, 27, 42, 0.5) !important;
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
-        padding: 1rem;
-        border: 1px solid rgba(41, 181, 232, 0.3);
-    }}
-    
-    /* Make info/warning/success boxes semi-transparent */
-    [data-testid="stAlert"] {{
-        background: rgba(13, 27, 42, 0.5) !important;
-        backdrop-filter: blur(10px);
-    }}
-    
-    /* Keep buttons fully opaque */
-    .stButton > button {{
-        background: linear-gradient(135deg, #29B5E8 0%, #1E88E5 100%) !important;
-        opacity: 1 !important;
-    }}
-    
-    /* Semi-transparent metric containers */
-    [data-testid="stMetric"] {{
-        background: rgba(13, 27, 42, 0.5);
-        backdrop-filter: blur(10px);
-        border-radius: 8px;
-        padding: 0.5rem;
-        border: 1px solid rgba(41, 181, 232, 0.2);
-    }}
-    
-    /* Semi-transparent columns/containers */
-    [data-testid="column"] > div {{
-        background: rgba(13, 27, 42, 0.5);
-        backdrop-filter: blur(8px);
-        border-radius: 12px;
-        padding: 1rem;
-        border: 1px solid rgba(41, 181, 232, 0.2);
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Try to set background image if it's a valid URL (http, data:, or path)
-    if bg_image_url and (bg_image_url.startswith('http') or bg_image_url.startswith('data:') or bg_image_url.startswith('/')):
-        st.markdown(f'<div class="investigation-bg"></div>', unsafe_allow_html=True)
     
     # Title
     st.title(f"📍 {location.city}, {location.country}")
@@ -1504,6 +1399,17 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     
     with col_left:
         st.subheader(f"🏙️ Welcome to {location.city}")
+        
+        # Display city image from stage
+        if location.image_url:
+            # If image_url is set, use it directly
+            try:
+                st.image(location.image_url, caption=f"{location.city}, {location.country}", use_container_width=True)
+            except:
+                render_stage_image(location.id, f"{location.city}, {location.country}")
+        else:
+            # Try to load from stage using location_id
+            render_stage_image(location.id, f"{location.city}, {location.country}")
         
         if location.description:
             st.info(location.description)
