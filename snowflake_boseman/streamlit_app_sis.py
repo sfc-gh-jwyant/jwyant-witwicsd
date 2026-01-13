@@ -1260,6 +1260,83 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     return False
 
 
+def get_stage_image_base64(location_id: str) -> Optional[str]:
+    """
+    Get a location image from the stage as a base64 data URL.
+    Used for CSS background-image which needs a browser-accessible URL.
+    
+    Returns None if image not found.
+    """
+    import base64
+    
+    extensions = [("jpg", "image/jpeg"), ("png", "image/png")]
+    session = get_snowflake_session()
+    
+    for ext, mime_type in extensions:
+        try:
+            image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
+            local_path = f"/tmp/{location_id}.{ext}"
+            
+            # Try to download from stage
+            session.file.get(image_path, "/tmp/")
+            
+            # Read and encode as base64
+            with open(local_path, "rb") as f:
+                image_bytes = f.read()
+                b64_string = base64.b64encode(image_bytes).decode("utf-8")
+                return f"data:{mime_type};base64,{b64_string}"
+        except Exception:
+            continue
+    
+    return None
+
+
+def apply_background_image(image_url: Optional[str], opacity: float = 0.25):
+    """
+    Apply a background image to the app using CSS.
+    
+    Args:
+        image_url: The image URL (can be http, data:, or None)
+        opacity: Background opacity (0.0 to 1.0)
+    """
+    if not image_url:
+        return
+    
+    st.markdown(f"""
+    <style>
+    /* City background image */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-image: url('{image_url}');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+        opacity: {opacity};
+        z-index: -1;
+        pointer-events: none;
+    }}
+    
+    /* Semi-transparent containers for readability */
+    [data-testid="stVerticalBlock"] > div {{
+        background: rgba(13, 27, 42, 0.7);
+        backdrop-filter: blur(5px);
+        border-radius: 8px;
+        padding: 0.5rem;
+    }}
+    
+    /* Keep buttons fully opaque */
+    .stButton > button {{
+        opacity: 1 !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+
+
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
     """Render a placeholder for missing art with Snowflake styling."""
     st.markdown(f"""
@@ -1366,6 +1443,13 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     """Render investigation screen."""
     result = {"action": None}
     
+    # Apply city image as background
+    bg_image_url = location.image_url
+    if not bg_image_url:
+        # Try to get image from stage as base64
+        bg_image_url = get_stage_image_base64(location.id)
+    apply_background_image(bg_image_url, opacity=0.25)
+    
     # Title
     st.title(f"📍 {location.city}, {location.country}")
     st.caption(f"{location.continent}")
@@ -1401,16 +1485,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     with col_left:
         st.subheader(f"🏙️ Welcome to {location.city}")
         
-        # Display city image from stage
-        if location.image_url:
-            # If image_url is set, use it directly
-            try:
-                st.image(location.image_url, caption=f"{location.city}, {location.country}", use_container_width=True)
-            except:
-                render_stage_image(location.id, f"{location.city}, {location.country}")
-        else:
-            # Try to load from stage using location_id
-            render_stage_image(location.id, f"{location.city}, {location.country}")
+        # City image is displayed as background via CSS
         
         if location.description:
             st.info(location.description)
