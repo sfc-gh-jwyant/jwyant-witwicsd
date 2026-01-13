@@ -30,7 +30,8 @@ TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
 # Stage for media files (city images, landmarks, etc.)
 # Images are in the media/ folder, named like "loc_paris.jpg" or "loc_paris.png"
-MEDIA_STAGE = "@DEMO_WITWISBM.GAME.MEDIA/media"  # Stage path including media/ folder
+# Full path format: @"DATABASE"."SCHEMA"."STAGE_NAME"/folder/file.ext
+MEDIA_STAGE = '@"DEMO_WITWISBM"."GAME"."DEMO_WITWISBM"/media'  # Stage path including media/ folder
 
 # Available AI models for Snowflake Cortex AI_COMPLETE
 # See: https://docs.snowflake.com/en/sql-reference/functions/ai_complete-single-string#arguments
