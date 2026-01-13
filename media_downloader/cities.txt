@@ -1,2 +1,105 @@
 Paris
+London
 Rome
+Amsterdam
+Barcelona
+Tokyo
+Bangkok
+Mumbai
+Singapore
+Beijing
+New York City
+Los Angeles
+Mexico City
+Toronto
+San Francisco
+Rio de Janeiro
+Buenos Aires
+Lima
+Cairo
+Cape Town
+Marrakech
+Sydney
+Auckland
+McMurdo Station
+Bozeman
+Berlin
+Vienna
+Prague
+Budapest
+Athens
+Lisbon
+Dublin
+Edinburgh
+Stockholm
+Copenhagen
+Oslo
+Helsinki
+Warsaw
+Brussels
+Zurich
+Munich
+Milan
+Venice
+Florence
+Istanbul
+Seoul
+Hong Kong
+Shanghai
+Taipei
+Hanoi
+Ho Chi Minh City
+Kuala Lumpur
+Jakarta
+Manila
+Delhi
+Kathmandu
+Colombo
+Dhaka
+Osaka
+Kyoto
+Dubai
+Doha
+Tel Aviv
+Jerusalem
+Baku
+Chicago
+Miami
+Las Vegas
+Seattle
+Boston
+New Orleans
+Washington D.C.
+Denver
+Vancouver
+Montreal
+Havana
+Cancun
+Guadalajara
+Panama City
+San Juan
+Bogotá
+Medellín
+Santiago
+Quito
+La Paz
+Montevideo
+Cartagena
+Cusco
+São Paulo
+Salvador
+Nairobi
+Johannesburg
+Lagos
+Accra
+Addis Ababa
+Dakar
+Casablanca
+Tunis
+Luxor
+Zanzibar City
+Melbourne
+Brisbane
+Perth
+Wellington
+Suva

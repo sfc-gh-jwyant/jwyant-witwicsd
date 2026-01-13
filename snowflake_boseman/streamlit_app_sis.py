@@ -29,8 +29,8 @@ from datetime import datetime
 TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
 # Stage for media files (city images, landmarks, etc.)
-# Images are named like "loc_paris.jpg", "loc_newyork.jpg"
-MEDIA_STAGE = "@DEMO_WITWISBM.GAME.MEDIA"  # e.g., "@DEMO_WITWISBM.GAME.MEDIA"
+# Images are in the media/ folder, named like "loc_paris.jpg" or "loc_paris.png"
+MEDIA_STAGE = "@DEMO_WITWISBM.GAME.MEDIA/media"  # Stage path including media/ folder
 
 # Available AI models for Snowflake Cortex AI_COMPLETE
 # See: https://docs.snowflake.com/en/sql-reference/functions/ai_complete-single-string#arguments
@@ -1225,40 +1225,74 @@ def apply_theme():
 def render_stage_image(location_id: str, alt_text: str, use_container_width: bool = True):
     """
     Render an image from the Snowflake stage.
-    Images are stored as loc_[city].jpg in the MEDIA stage.
+    Images are stored as loc_[city].jpg or loc_[city].png in the media/ folder.
     
     In Streamlit in Snowflake, use st.image with the stage path.
     """
-    try:
-        # Construct the stage file path
-        # location_id format: "loc_paris" -> file: "loc_paris.jpg"
-        image_path = f"{MEDIA_STAGE}/{location_id}.jpg"
-        
-        # In Streamlit in Snowflake, we can read from stage directly
-        session = get_snowflake_session()
-        
-        # Try to read the image from stage
-        # Using GET to read binary file content
+    # Try both jpg and png extensions
+    extensions = ["jpg", "png"]
+    
+    for ext in extensions:
         try:
-            # Read image bytes from stage
-            result = session.file.get(image_path, "/tmp/")
-            local_path = f"/tmp/{location_id}.jpg"
-            st.image(local_path, caption=alt_text, use_container_width=use_container_width)
-            return True
-        except Exception:
-            # Alternative: Try using the stage URL directly
-            # Some SiS versions support direct stage URLs
+            # Construct the stage file path
+            image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
+            
+            # In Streamlit in Snowflake, we can read from stage directly
+            session = get_snowflake_session()
+            
+            # Try to read the image from stage using GET
             try:
-                st.image(image_path, caption=alt_text, use_container_width=use_container_width)
+                result = session.file.get(image_path, "/tmp/")
+                local_path = f"/tmp/{location_id}.{ext}"
+                st.image(local_path, caption=alt_text, use_container_width=use_container_width)
                 return True
-            except:
-                pass
-    except Exception as e:
-        pass
+            except Exception:
+                # Alternative: Try using the stage URL directly
+                try:
+                    st.image(image_path, caption=alt_text, use_container_width=use_container_width)
+                    return True
+                except:
+                    pass
+        except Exception:
+            continue
     
     # Fallback to placeholder
     render_art_placeholder("Location", alt_text)
     return False
+
+
+def get_stage_image_url(location_id: str) -> Optional[str]:
+    """
+    Get a base64 data URL for a location image from the stage.
+    Tries both .jpg and .png extensions.
+    Returns None if image not found.
+    
+    For CSS background-image, we need a browser-accessible URL.
+    Stage paths like @STAGE/file.jpg don't work directly in CSS.
+    We read the file and convert to base64 data URL.
+    """
+    import base64
+    
+    extensions = [("jpg", "image/jpeg"), ("png", "image/png")]
+    session = get_snowflake_session()
+    
+    for ext, mime_type in extensions:
+        try:
+            image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
+            local_path = f"/tmp/{location_id}.{ext}"
+            
+            # Try to download from stage
+            session.file.get(image_path, "/tmp/")
+            
+            # Read and encode as base64
+            with open(local_path, "rb") as f:
+                image_bytes = f.read()
+                b64_string = base64.b64encode(image_bytes).decode("utf-8")
+                return f"data:{mime_type};base64,{b64_string}"
+        except Exception:
+            continue
+    
+    return None
 
 
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
@@ -1370,8 +1404,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     # Get the background image URL
     bg_image_url = location.image_url
     if not bg_image_url:
-        # Construct stage URL - this may need adjustment based on your stage setup
-        bg_image_url = f"{MEDIA_STAGE}/{location.id}.jpg"
+        # Construct stage URL - try to get from stage (could be .jpg or .png)
+        bg_image_url = get_stage_image_url(location.id)
     
     # Apply background image CSS with semi-transparent overlay containers
     st.markdown(f"""
@@ -1432,8 +1466,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     </style>
     """, unsafe_allow_html=True)
     
-    # Try to set background image if it's a valid URL
-    if bg_image_url and (bg_image_url.startswith('http') or bg_image_url.startswith('/')):
+    # Try to set background image if it's a valid URL (http, data:, or path)
+    if bg_image_url and (bg_image_url.startswith('http') or bg_image_url.startswith('data:') or bg_image_url.startswith('/')):
         st.markdown(f'<div class="investigation-bg"></div>', unsafe_allow_html=True)
     
     # Title
