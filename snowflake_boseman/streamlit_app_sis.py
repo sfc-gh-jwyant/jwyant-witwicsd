@@ -464,6 +464,15 @@ class GameController:
         
         return self._current_player
     
+    def _get_stolen_items(self) -> List[str]:
+        """Get stolen items from database."""
+        try:
+            rows = execute_query(f"SELECT item_name FROM {TABLE_PREFIX}stolen_items ORDER BY RANDOM()")
+            return [r.get("ITEM_NAME", r.get("item_name", "")) for r in rows if r.get("ITEM_NAME") or r.get("item_name")]
+        except Exception as e:
+            print(f"Error loading stolen items: {e}")
+            return []
+    
     def get_all_locations(self) -> List[Location]:
         """Get all locations from database."""
         if self._locations_cache:
@@ -531,15 +540,12 @@ class GameController:
         
         # Create case
         case_id = f"case_{uuid.uuid4().hex[:12]}"
-        stolen_items = [
-            "the Declaration of Independence",
-            "the Hope Diamond",
-            "the Mona Lisa",
-            "the Crown Jewels",
-            "ancient scrolls",
-            "a rare data warehouse",
-            "the Snowflake source code",
-        ]
+        
+        # Load stolen items from database
+        stolen_items = self._get_stolen_items()
+        if not stolen_items:
+            # Fallback if table doesn't exist
+            stolen_items = ["the Data Cloud", "a Virtual Warehouse", "the Snowflake source code"]
         
         case = Case(
             id=case_id,
