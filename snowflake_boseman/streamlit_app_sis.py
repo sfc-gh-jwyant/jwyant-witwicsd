@@ -64,11 +64,11 @@ DEFAULT_AI_MODEL = "llama3.1-70b"
 # Difficulty config loaded from database - see get_difficulty_config()
 # Fallback values used if database is unavailable
 DIFFICULTY_CONFIG_FALLBACK = {
-    1: {"name": "SELECT * FROM clues", "description": "Obvious clues, short chase", "time_budget": 144, "clue_clarity": "obvious", "min_locations": 3, "max_locations": 4, "red_herrings": 0, "decoy_destinations": 2},
-    2: {"name": "WITH (NOLOCK)", "description": "Clear hints, moderate chase", "time_budget": 144, "clue_clarity": "clear", "min_locations": 4, "max_locations": 5, "red_herrings": 1, "decoy_destinations": 4},
-    3: {"name": "Foreign Key Violation", "description": "Cryptic clues, longer chase", "time_budget": 144, "clue_clarity": "cryptic", "min_locations": 5, "max_locations": 7, "red_herrings": 2, "decoy_destinations": 6},
-    4: {"name": "Deadlock Victim", "description": "Very cryptic, extended chase", "time_budget": 144, "clue_clarity": "very_cryptic", "min_locations": 7, "max_locations": 9, "red_herrings": 3, "decoy_destinations": 8},
-    5: {"name": "Little Bobby Tables", "description": "Riddles only, world tour", "time_budget": 144, "clue_clarity": "riddle", "min_locations": 9, "max_locations": 12, "red_herrings": 4, "decoy_destinations": 10},
+    1: {"name": "XS Warehouse", "description": "Extra Small challenge - clues served instantly", "time_budget": 144, "clue_clarity": "obvious", "min_locations": 3, "max_locations": 4, "red_herrings": 0, "decoy_destinations": 2},
+    2: {"name": "Query Queued", "description": "Your investigation has been queued behind 3 others", "time_budget": 144, "clue_clarity": "clear", "min_locations": 4, "max_locations": 5, "red_herrings": 1, "decoy_destinations": 4},
+    3: {"name": "Schema Drift", "description": "The clues keep changing when you're not looking", "time_budget": 144, "clue_clarity": "cryptic", "min_locations": 5, "max_locations": 7, "red_herrings": 2, "decoy_destinations": 6},
+    4: {"name": "Cortex Hallucinating", "description": "The AI is confident but probably wrong", "time_budget": 144, "clue_clarity": "very_cryptic", "min_locations": 7, "max_locations": 9, "red_herrings": 3, "decoy_destinations": 8},
+    5: {"name": "DROP PRODUCTION CASCADE", "description": "Everything is on fire. Good luck.", "time_budget": 144, "clue_clarity": "riddle", "min_locations": 9, "max_locations": 12, "red_herrings": 4, "decoy_destinations": 10},
 }
 
 INVESTIGATION_TIME = 5  # Hours per investigation (like original Carmen Sandiego)
