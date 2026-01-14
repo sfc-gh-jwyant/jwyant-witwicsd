@@ -1,5 +1,6 @@
 -- Snowflake Cortex LLM Credit Consumption Rates
 -- Source: https://www.snowflake.com/legal-files/CreditConsumptionTable.pdf (Table 6a)
+-- Effective: January 13, 2026
 -- Credits per 1 million tokens
 
 CREATE OR REPLACE TABLE cortex_credit_rates (
@@ -8,42 +9,34 @@ CREATE OR REPLACE TABLE cortex_credit_rates (
     credits_per_million_output_tokens FLOAT NOT NULL,
     model_provider VARCHAR,
     notes VARCHAR,
-    last_updated DATE DEFAULT CURRENT_DATE()
+    effective_date DATE DEFAULT '2026-01-13'
 );
 
--- Insert credit rates for Cortex LLM models
--- Note: Rates are subject to change - verify against current Snowflake documentation
+-- Insert credit rates for Cortex LLM models from Table 6(a)
+-- Values from Snowflake Service Consumption Table effective January 13, 2026
 INSERT INTO cortex_credit_rates (model_name, credits_per_million_input_tokens, credits_per_million_output_tokens, model_provider, notes) VALUES
--- Llama models
-('llama3.1-8b', 0.19, 0.19, 'Meta', 'Llama 3.1 8B parameter model'),
-('llama3.1-70b', 1.21, 1.21, 'Meta', 'Llama 3.1 70B parameter model'),
-('llama3.1-405b', 3.00, 3.00, 'Meta', 'Llama 3.1 405B parameter model'),
-('llama3.3-70b', 1.21, 1.21, 'Meta', 'Llama 3.3 70B parameter model'),
-('llama3-8b', 0.19, 0.19, 'Meta', 'Llama 3 8B parameter model'),
-('llama3-70b', 1.21, 1.21, 'Meta', 'Llama 3 70B parameter model'),
-('llama4-maverick', 0.48, 1.44, 'Meta', 'Llama 4 Maverick model'),
-('llama4-scout', 0.24, 0.96, 'Meta', 'Llama 4 Scout model'),
 
--- Snowflake models
-('snowflake-arctic', 0.84, 1.05, 'Snowflake', 'Snowflake Arctic model'),
-('snowflake-llama-3.1-405b', 3.00, 3.00, 'Snowflake', 'Snowflake-hosted Llama 3.1 405B'),
-('snowflake-llama-3.3-70b', 1.21, 1.21, 'Snowflake', 'Snowflake-hosted Llama 3.3 70B'),
+-- Anthropic Claude models
+('claude-4-sonnet', 3.14, 15.69, 'Anthropic', 'Claude 4 Sonnet'),
+('claude-4-5-sonnet', 3.45, 17.26, 'Anthropic', 'Claude 4.5 Sonnet'),
+('claude-haiku-4-5', 1.15, 5.75, 'Anthropic', 'Claude Haiku 4.5'),
 
 -- Mistral models
-('mistral-7b', 0.12, 0.12, 'Mistral AI', 'Mistral 7B parameter model'),
-('mistral-large', 5.10, 15.30, 'Mistral AI', 'Mistral Large model'),
-('mistral-large2', 3.00, 9.00, 'Mistral AI', 'Mistral Large 2 model'),
-('mixtral-8x7b', 0.22, 0.22, 'Mistral AI', 'Mixtral 8x7B MoE model'),
+('mistral-large2', 2.09, 6.28, 'Mistral AI', 'Mistral Large 2'),
 
--- Anthropic Claude models (if available in your region)
-('claude-3-5-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 3.5 Sonnet'),
-('claude-3-7-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 3.7 Sonnet'),
-('claude-4-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 4 Sonnet'),
-('claude-4-opus', 15.00, 37.50, 'Anthropic', 'Claude 4 Opus - highest capability'),
+-- OpenAI models
+('openai-gpt-4.1', 2.30, 9.21, 'OpenAI', 'GPT-4.1'),
+('openai-gpt-5', 1.44, 11.51, 'OpenAI', 'GPT-5'),
 
--- OpenAI models (if available in your region)
-('openai-gpt-4.1', 2.00, 8.00, 'OpenAI', 'GPT-4.1 model'),
-('openai-o4-mini', 1.10, 4.40, 'OpenAI', 'GPT-4o mini model'),
+-- Fine-tuning models from Table 6(g) - inference rates
+('llama3.1-70b', 2.42, 2.42, 'Meta', 'Llama 3.1 70B - Fine-tuning inference rate'),
+('llama3.1-8b', 0.38, 0.38, 'Meta', 'Llama 3.1 8B - Fine-tuning inference rate'),
+('mistral-7b', 0.24, 0.24, 'Mistral AI', 'Mistral 7B - Fine-tuning inference rate'),
+('mixtral-8x7b', 0.44, 0.44, 'Mistral AI', 'Mixtral 8x7B - Fine-tuning inference rate'),
+('llama3-70b', 2.42, 2.42, 'Meta', 'Llama 3 70B - Legacy fine-tuning inference rate'),
+('llama3-8b', 0.38, 0.38, 'Meta', 'Llama 3 8B - Legacy fine-tuning inference rate');
 
--- DeepSeek models
-('deepseek-r1', 0.55, 2.19, 'DeepSeek', 'DeepSeek R1 reasoning model');
+-- NOTE: Some models from our AVAILABLE_AI_MODELS list may not be in Table 6(a)
+-- Verify against current documentation for: llama3.1-405b, llama3.3-70b, llama4-maverick, 
+-- llama4-scout, mistral-large, deepseek-r1, snowflake-arctic, snowflake-llama-3.1-405b, 
+-- snowflake-llama-3.3-70b, claude-3-5-sonnet, claude-3-7-sonnet, claude-4-opus, openai-o4-mini
