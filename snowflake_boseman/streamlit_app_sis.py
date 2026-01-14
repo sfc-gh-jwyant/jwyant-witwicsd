@@ -997,7 +997,6 @@ Generate ONLY the witness quote, nothing else."""
             # Get selected model from session state
             model = st.session_state.get("ai_model", DEFAULT_AI_MODEL)
             
-            # Count input tokens using SNOWFLAKE.CORTEX.COUNT_TOKENS
             # Use a compatible model name for token counting (some models may not be supported)
             token_count_model = model if model in [
                 "llama3-70b", "llama3-8b", "llama3.1-405b", "llama3.1-70b", "llama3.1-8b",
@@ -1006,32 +1005,52 @@ Generate ONLY the witness quote, nothing else."""
                 "snowflake-arctic", "snowflake-llama-3.1-405b", "snowflake-llama-3.3-70b"
             ] else "llama3.1-70b"  # Default to a supported model for counting
             
+            # Combined query: AI_COMPLETE + COUNT_TOKENS on input in same SELECT
             input_tokens = 0
-            try:
-                token_result = session.sql(f"""
-                    SELECT SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_prompt}') as tokens
-                """).collect()
-                if token_result and len(token_result) > 0:
-                    input_tokens = token_result[0]['TOKENS'] or 0
-            except Exception:
-                pass  # Token counting failed, continue without it
-            
-            result = session.sql(f"""
-                SELECT AI_COMPLETE(
-                    model => '{model}',
-                    prompt => '{safe_prompt}',
-                    model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
-                ) as response
-            """).collect()
-            
-            # Estimate output tokens (rough estimate: response length / 4)
-            output_tokens = 0
             response = None
-            if result and len(result) > 0:
-                response = result[0]['RESPONSE']
-                if response:
-                    response = response.strip().strip('"').strip("'")
-                    output_tokens = len(response) // 4  # Rough estimate
+            try:
+                result = session.sql(f"""
+                    SELECT 
+                        AI_COMPLETE(
+                            model => '{model}',
+                            prompt => '{safe_prompt}',
+                            model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
+                        ) as response,
+                        SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_prompt}') as input_tokens
+                """).collect()
+                
+                if result and len(result) > 0:
+                    response = result[0]['RESPONSE']
+                    input_tokens = result[0]['INPUT_TOKENS'] or 0
+                    if response:
+                        response = response.strip().strip('"').strip("'")
+            except Exception:
+                # Fallback: try without token counting
+                result = session.sql(f"""
+                    SELECT AI_COMPLETE(
+                        model => '{model}',
+                        prompt => '{safe_prompt}',
+                        model_parameters => {{'guardrails': TRUE, 'max_tokens': 150, 'temperature': 0.7}}
+                    ) as response
+                """).collect()
+                if result and len(result) > 0:
+                    response = result[0]['RESPONSE']
+                    if response:
+                        response = response.strip().strip('"').strip("'")
+            
+            # Count output tokens using COUNT_TOKENS, fallback to len/4
+            output_tokens = 0
+            if response:
+                safe_response = response.replace("'", "''")
+                try:
+                    token_result = session.sql(f"""
+                        SELECT SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_response}') as tokens
+                    """).collect()
+                    if token_result and len(token_result) > 0:
+                        output_tokens = token_result[0]['TOKENS'] or 0
+                except Exception:
+                    # Fallback to rough estimate
+                    output_tokens = len(response) // 4
             
             total_tokens = input_tokens + output_tokens
             
