@@ -39,7 +39,7 @@ INSERT INTO cortex_credit_rates (model_name, credits_per_million_input_tokens, c
 ('claude-3-5-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 3.5 Sonnet'),
 ('claude-3-7-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 3.7 Sonnet'),
 ('claude-4-sonnet', 3.00, 15.00, 'Anthropic', 'Claude 4 Sonnet'),
-('claude-4-opus', 15.00, 75.00, 'Anthropic', 'Claude 4 Opus - highest capability'),
+('claude-4-opus', 15.00, 37.50, 'Anthropic', 'Claude 4 Opus - highest capability'),
 
 -- OpenAI models (if available in your region)
 ('openai-gpt-4.1', 2.00, 8.00, 'OpenAI', 'GPT-4.1 model'),
