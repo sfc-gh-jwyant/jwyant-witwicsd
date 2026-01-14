@@ -2030,25 +2030,29 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
-    # Display suspects in a grid (3 per row)
-    cols_per_row = 3
-    for i in range(0, len(suspects), cols_per_row):
-        cols = st.columns(cols_per_row)
-        for j, col in enumerate(cols):
-            if i + j < len(suspects):
-                suspect = suspects[i + j]
-                with col:
-                    # Mugshot
-                    render_suspect_mugshot(suspect.id, suspect.name)
-                    
-                    # Name and key details
-                    st.markdown(f"**{suspect.name}**")
-                    st.caption(f"Hair: {suspect.hair_color} | Eyes: {suspect.eye_color}")
-                    st.caption(f"Hobby: {suspect.hobby}")
-                    
-                    # Arrest button
-                    if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
-                        return suspect.id
+    # Display each suspect: mugshot left, attributes right, arrest button below
+    for suspect in suspects:
+        col_mugshot, col_details = st.columns([1, 2])
+        
+        with col_mugshot:
+            render_suspect_mugshot(suspect.id, suspect.name)
+        
+        with col_details:
+            st.markdown(f"**{suspect.name}**")
+            st.markdown(f"""
+            - **Hair:** {suspect.hair_color}
+            - **Eyes:** {suspect.eye_color}
+            - **Hobby:** {suspect.hobby}
+            - **Vehicle:** {suspect.vehicle}
+            - **Favorite Food:** {suspect.favorite_food}
+            - **Distinguishing Feature:** {suspect.distinguishing_feature}
+            """)
+        
+        # Arrest button spans full width below
+        if st.button(f"🚨 ARREST {suspect.name.upper()}", key=f"arrest_{suspect.id}", use_container_width=True):
+            return suspect.id
+        
+        st.divider()
     
     return None
 
