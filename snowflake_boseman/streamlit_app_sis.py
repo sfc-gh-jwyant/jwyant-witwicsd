@@ -1232,8 +1232,8 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     
     In Streamlit in Snowflake, use st.image with the stage path.
     """
-    # Try both jpg and png extensions
-    extensions = ["jpg", "png"]
+    # Try jpg, jpeg, and png extensions
+    extensions = ["jpg", "jpeg", "png"]
     session = get_snowflake_session()
     
     for ext in extensions:
