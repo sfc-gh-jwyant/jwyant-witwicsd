@@ -64,14 +64,14 @@ DEFAULT_AI_MODEL = "llama3.1-70b"
 # Difficulty config loaded from database - see get_difficulty_config()
 # Fallback values used if database is unavailable
 DIFFICULTY_CONFIG_FALLBACK = {
-    1: {"name": "SELECT * FROM clues", "description": "All clues visible, lots of time", "time_budget": 72, "clue_clarity": "obvious", "min_locations": 3, "max_locations": 4, "red_herrings": 0, "decoy_destinations": 2},
-    2: {"name": "WITH (NOLOCK)", "description": "Clear hints, moderate challenge", "time_budget": 48, "clue_clarity": "clear", "min_locations": 4, "max_locations": 5, "red_herrings": 1, "decoy_destinations": 3},
-    3: {"name": "Foreign Key Violation", "description": "Cryptic clues, tighter deadline", "time_budget": 36, "clue_clarity": "cryptic", "min_locations": 5, "max_locations": 7, "red_herrings": 2, "decoy_destinations": 5},
-    4: {"name": "Deadlock Victim", "description": "Very cryptic, time pressure", "time_budget": 24, "clue_clarity": "very_cryptic", "min_locations": 6, "max_locations": 8, "red_herrings": 3, "decoy_destinations": 7},
-    5: {"name": "Little Bobby Tables", "description": "Expert mode - riddles only", "time_budget": 12, "clue_clarity": "riddle", "min_locations": 8, "max_locations": 10, "red_herrings": 4, "decoy_destinations": 10},
+    1: {"name": "SELECT * FROM clues", "description": "Obvious clues, short chase", "time_budget": 144, "clue_clarity": "obvious", "min_locations": 3, "max_locations": 4, "red_herrings": 0, "decoy_destinations": 2},
+    2: {"name": "WITH (NOLOCK)", "description": "Clear hints, moderate chase", "time_budget": 144, "clue_clarity": "clear", "min_locations": 4, "max_locations": 5, "red_herrings": 1, "decoy_destinations": 4},
+    3: {"name": "Foreign Key Violation", "description": "Cryptic clues, longer chase", "time_budget": 144, "clue_clarity": "cryptic", "min_locations": 5, "max_locations": 7, "red_herrings": 2, "decoy_destinations": 6},
+    4: {"name": "Deadlock Victim", "description": "Very cryptic, extended chase", "time_budget": 144, "clue_clarity": "very_cryptic", "min_locations": 7, "max_locations": 9, "red_herrings": 3, "decoy_destinations": 8},
+    5: {"name": "Little Bobby Tables", "description": "Riddles only, world tour", "time_budget": 144, "clue_clarity": "riddle", "min_locations": 9, "max_locations": 12, "red_herrings": 4, "decoy_destinations": 10},
 }
 
-INVESTIGATION_TIME = 2  # Hours per investigation
+INVESTIGATION_TIME = 5  # Hours per investigation (like original Carmen Sandiego)
 
 # =============================================================================
 # DATA MODELS
