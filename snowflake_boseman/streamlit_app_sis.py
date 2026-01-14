@@ -1992,29 +1992,63 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
     return result
 
 
+def render_suspect_mugshot(suspect_id: str, suspect_name: str):
+    """Render suspect mugshot from stage (240x120px)."""
+    extensions = ["png", "jpeg", "jpg"]
+    session = get_snowflake_session()
+    
+    for ext in extensions:
+        try:
+            image_path = f'{MEDIA_STAGE}/{suspect_id}.{ext}'
+            try:
+                result = session.file.get(image_path, "/tmp/")
+                local_path = f"/tmp/{suspect_id}.{ext}"
+                st.image(local_path, width=240)
+                return True
+            except:
+                try:
+                    st.image(image_path, width=240)
+                    return True
+                except:
+                    pass
+        except:
+            continue
+    
+    # Fallback placeholder
+    st.markdown(f"""
+    <div style="width: 240px; height: 120px; background: rgba(0,0,0,0.3); 
+                border: 2px dashed #29B5E8; border-radius: 8px; 
+                display: flex; align-items: center; justify-content: center;">
+        <span style="color: #29B5E8;">🕵️ {suspect_name[:15]}</span>
+    </div>
+    """, unsafe_allow_html=True)
+    return False
+
+
 def render_arrest(controller: GameController, suspects: List[Suspect]) -> Optional[str]:
-    """Render arrest screen."""
+    """Render arrest screen with mugshots."""
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
-    for suspect in suspects:
-        with st.expander(f"🕵️ {suspect.name}"):
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                render_art_placeholder("Suspect", suspect.name, 120, 160)
-            
-            with col2:
-                st.markdown(f"""
-                - **Hair:** {suspect.hair_color}
-                - **Eyes:** {suspect.eye_color}
-                - **Hobby:** {suspect.hobby}
-                - **Vehicle:** {suspect.vehicle}
-                - **Favorite Food:** {suspect.favorite_food}
-                """)
-            
-            if st.button(f"🚨 ARREST {suspect.name.upper()}", key=f"arrest_{suspect.id}"):
-                return suspect.id
+    # Display suspects in a grid (3 per row)
+    cols_per_row = 3
+    for i in range(0, len(suspects), cols_per_row):
+        cols = st.columns(cols_per_row)
+        for j, col in enumerate(cols):
+            if i + j < len(suspects):
+                suspect = suspects[i + j]
+                with col:
+                    # Mugshot
+                    render_suspect_mugshot(suspect.id, suspect.name)
+                    
+                    # Name and key details
+                    st.markdown(f"**{suspect.name}**")
+                    st.caption(f"Hair: {suspect.hair_color} | Eyes: {suspect.eye_color}")
+                    st.caption(f"Hobby: {suspect.hobby}")
+                    
+                    # Arrest button
+                    if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
+                        return suspect.id
     
     return None
 
