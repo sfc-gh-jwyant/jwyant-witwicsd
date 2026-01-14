@@ -18,16 +18,6 @@ CREATE OR REPLACE HYBRID TABLE locations (
     image_url VARCHAR  -- Location scene art (full background)
 );
 
-CREATE OR REPLACE HYBRID TABLE landmarks (
-    landmark_id VARCHAR PRIMARY KEY,
-    location_id VARCHAR NOT NULL,
-    name VARCHAR NOT NULL,
-    landmark_type VARCHAR,
-    clue_facts ARRAY,  -- JSON array of facts for clue generation
-    image_url VARCHAR,  -- Landmark art (200x150px)
-    FOREIGN KEY (location_id) REFERENCES locations(location_id)
-);
-
 CREATE OR REPLACE HYBRID TABLE suspects (
     suspect_id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
@@ -38,13 +28,6 @@ CREATE OR REPLACE HYBRID TABLE suspects (
     favorite_food VARCHAR,
     distinguishing_feature VARCHAR,
     mugshot_url VARCHAR  -- Suspect portrait art (150x200px)
-);
-
-CREATE OR REPLACE HYBRID TABLE clue_images (
-    image_id VARCHAR PRIMARY KEY,
-    clue_type VARCHAR NOT NULL,  -- 'destination', 'suspect', 'item'
-    image_url VARCHAR NOT NULL,  -- Clue art (100x100px)
-    description VARCHAR
 );
 
 -- ============================================================================
@@ -64,31 +47,6 @@ CREATE OR REPLACE HYBRID TABLE players (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE OR REPLACE HYBRID TABLE cases (
-    case_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    suspect_id VARCHAR NOT NULL,
-    stolen_item VARCHAR NOT NULL,
-    difficulty INT NOT NULL,
-    location_path ARRAY,  -- Ordered list of location_ids
-    status VARCHAR DEFAULT 'active',  -- 'active', 'won', 'lost'
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    FOREIGN KEY (player_id) REFERENCES players(player_id),
-    FOREIGN KEY (suspect_id) REFERENCES suspects(suspect_id)
-);
-
-CREATE OR REPLACE HYBRID TABLE case_progress (
-    case_id VARCHAR PRIMARY KEY,
-    current_location_id VARCHAR NOT NULL,
-    suspect_location_idx INT DEFAULT 0,
-    hours_remaining INT NOT NULL,
-    clues_gathered ARRAY,  -- Collected clue texts
-    locations_visited ARRAY,  -- Visited location_ids
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    FOREIGN KEY (case_id) REFERENCES cases(case_id),
-    FOREIGN KEY (current_location_id) REFERENCES locations(location_id)
-);
-
 CREATE OR REPLACE HYBRID TABLE high_scores (
     score_id VARCHAR PRIMARY KEY,
     player_id VARCHAR NOT NULL,
@@ -96,43 +54,11 @@ CREATE OR REPLACE HYBRID TABLE high_scores (
     difficulty INT NOT NULL,
     completion_time_hours INT NOT NULL,  -- Lower is better
     locations_visited INT NOT NULL,
-    score INT NOT NULL,  -- Calculated: (time_budget - completion_time) * difficulty_multiplier
+    score INT NOT NULL,  -- Based on AI credits used (lower is better, like golf)
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
     FOREIGN KEY (player_id) REFERENCES players(player_id),
-    FOREIGN KEY (case_id) REFERENCES cases(case_id),
     INDEX idx_high_scores_difficulty (difficulty),
-    INDEX idx_high_scores_score (score DESC)
-);
-
--- ============================================================================
--- TELEMETRY TABLES (Analytics)
--- ============================================================================
-
--- Track play sessions for engagement metrics
-CREATE OR REPLACE HYBRID TABLE game_sessions (
-    session_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    ended_at TIMESTAMP,
-    duration_seconds INT,
-    cases_started INT DEFAULT 0,
-    cases_completed INT DEFAULT 0,
-    FOREIGN KEY (player_id) REFERENCES players(player_id)
-);
-
--- Granular event log for funnel analysis
-CREATE OR REPLACE HYBRID TABLE game_events (
-    event_id VARCHAR PRIMARY KEY,
-    session_id VARCHAR NOT NULL,
-    player_id VARCHAR NOT NULL,
-    case_id VARCHAR,
-    event_type VARCHAR NOT NULL,  -- See event types in documentation
-    event_data VARIANT,  -- JSON payload with context
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    FOREIGN KEY (session_id) REFERENCES game_sessions(session_id),
-    INDEX idx_events_player (player_id),
-    INDEX idx_events_type (event_type),
-    INDEX idx_events_time (created_at)
+    INDEX idx_high_scores_score (score ASC)  -- Lower scores are better
 );
 
 -- Aggregated case outcomes for success/failure analysis
@@ -159,74 +85,31 @@ CREATE OR REPLACE HYBRID TABLE case_analytics (
     INDEX idx_analytics_outcome (outcome)
 );
 
--- Track where players get stuck (friction points)
-CREATE OR REPLACE HYBRID TABLE friction_points (
-    friction_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    case_id VARCHAR NOT NULL,
-    location_id VARCHAR NOT NULL,
-    friction_type VARCHAR NOT NULL,  -- 'repeated_wrong_travel', 'time_expired_here', 'abandoned_here'
-    attempts_at_location INT,
-    time_spent_hours INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    FOREIGN KEY (location_id) REFERENCES locations(location_id),
-    INDEX idx_friction_location (location_id),
-    INDEX idx_friction_type (friction_type)
+-- ============================================================================
+-- CONFIGURATION TABLES
+-- ============================================================================
+
+CREATE OR REPLACE HYBRID TABLE difficulty_levels (
+    difficulty_id INT PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    time_budget_hours INT NOT NULL,
+    clue_clarity VARCHAR NOT NULL,
+    min_locations INT NOT NULL,
+    max_locations INT NOT NULL,
+    red_herrings INT NOT NULL,
+    decoy_destinations INT NOT NULL
 );
 
--- ============================================================================
--- ANALYTICS VIEWS (for dashboards)
--- ============================================================================
+CREATE OR REPLACE HYBRID TABLE stolen_items (
+    item_id INT PRIMARY KEY,
+    item_name VARCHAR NOT NULL,
+    category VARCHAR
+);
 
--- Daily active users
-CREATE OR REPLACE VIEW v_daily_active_users AS
-SELECT DATE(started_at) as play_date, COUNT(DISTINCT player_id) as dau
-FROM game_sessions 
-GROUP BY 1 
-ORDER BY 1;
-
--- Win rate by difficulty
-CREATE OR REPLACE VIEW v_win_rate_by_difficulty AS
-SELECT 
-    difficulty,
-    CASE difficulty
-        WHEN 1 THEN 'SELECT * FROM clues'
-        WHEN 2 THEN 'WITH (NOLOCK)'
-        WHEN 3 THEN 'Foreign Key Violation'
-        WHEN 4 THEN 'Deadlock Victim'
-        WHEN 5 THEN 'Little Bobby Tables'
-    END as difficulty_name,
-    COUNT(*) as total_cases,
-    SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins,
-    ROUND(SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) / COUNT(*) * 100, 1) as win_rate_pct
-FROM case_analytics 
-GROUP BY difficulty 
-ORDER BY difficulty;
-
--- Top friction locations
-CREATE OR REPLACE VIEW v_friction_hotspots AS
-SELECT 
-    l.city, 
-    l.country, 
-    f.friction_type, 
-    COUNT(*) as occurrences
-FROM friction_points f
-JOIN locations l ON f.location_id = l.location_id
-GROUP BY 1, 2, 3 
-ORDER BY occurrences DESC 
-LIMIT 20;
-
--- Leaderboard
-CREATE OR REPLACE VIEW v_leaderboard AS
-SELECT 
-    p.snowflake_user,
-    p.rank,
-    p.cases_solved,
-    p.total_score,
-    MAX(hs.score) as best_score,
-    MIN(hs.completion_time_hours) as fastest_time
-FROM players p
-LEFT JOIN high_scores hs ON p.player_id = hs.player_id
-GROUP BY 1, 2, 3, 4
-ORDER BY p.total_score DESC;
-
+CREATE OR REPLACE HYBRID TABLE cortex_credit_rates (
+    model_name VARCHAR PRIMARY KEY,
+    input_rate FLOAT NOT NULL,  -- Credits per 1M input tokens
+    output_rate FLOAT NOT NULL, -- Credits per 1M output tokens
+    effective_date DATE NOT NULL
+);

@@ -25,15 +25,6 @@ CREATE OR REPLACE TABLE locations (
     image_url VARCHAR
 );
 
-CREATE OR REPLACE TABLE landmarks (
-    landmark_id VARCHAR PRIMARY KEY,
-    location_id VARCHAR NOT NULL,
-    name VARCHAR NOT NULL,
-    landmark_type VARCHAR,
-    clue_facts ARRAY,
-    image_url VARCHAR
-);
-
 CREATE OR REPLACE TABLE suspects (
     suspect_id VARCHAR PRIMARY KEY,
     name VARCHAR NOT NULL,
@@ -44,13 +35,6 @@ CREATE OR REPLACE TABLE suspects (
     favorite_food VARCHAR,
     distinguishing_feature VARCHAR,
     mugshot_url VARCHAR
-);
-
-CREATE OR REPLACE TABLE clue_images (
-    image_id VARCHAR PRIMARY KEY,
-    clue_type VARCHAR NOT NULL,
-    image_url VARCHAR NOT NULL,
-    description VARCHAR
 );
 
 CREATE OR REPLACE TABLE players (
@@ -66,27 +50,6 @@ CREATE OR REPLACE TABLE players (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
-CREATE OR REPLACE TABLE cases (
-    case_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    suspect_id VARCHAR NOT NULL,
-    stolen_item VARCHAR NOT NULL,
-    difficulty INT NOT NULL,
-    location_path ARRAY,
-    status VARCHAR DEFAULT 'active',
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
-CREATE OR REPLACE TABLE case_progress (
-    case_id VARCHAR PRIMARY KEY,
-    current_location_id VARCHAR NOT NULL,
-    suspect_location_idx INT DEFAULT 0,
-    hours_remaining INT NOT NULL,
-    clues_gathered ARRAY,
-    locations_visited ARRAY,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
 CREATE OR REPLACE TABLE high_scores (
     score_id VARCHAR PRIMARY KEY,
     player_id VARCHAR NOT NULL,
@@ -96,26 +59,6 @@ CREATE OR REPLACE TABLE high_scores (
     locations_visited INT NOT NULL,
     score INT NOT NULL,
     achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
-CREATE OR REPLACE TABLE game_sessions (
-    session_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP(),
-    ended_at TIMESTAMP,
-    duration_seconds INT,
-    cases_started INT DEFAULT 0,
-    cases_completed INT DEFAULT 0
-);
-
-CREATE OR REPLACE TABLE game_events (
-    event_id VARCHAR PRIMARY KEY,
-    session_id VARCHAR NOT NULL,
-    player_id VARCHAR NOT NULL,
-    case_id VARCHAR,
-    event_type VARCHAR NOT NULL,
-    event_data VARIANT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
 CREATE OR REPLACE TABLE case_analytics (
@@ -138,17 +81,6 @@ CREATE OR REPLACE TABLE case_analytics (
     ended_at TIMESTAMP
 );
 
-CREATE OR REPLACE TABLE friction_points (
-    friction_id VARCHAR PRIMARY KEY,
-    player_id VARCHAR NOT NULL,
-    case_id VARCHAR NOT NULL,
-    location_id VARCHAR NOT NULL,
-    friction_type VARCHAR NOT NULL,
-    attempts_at_location INT,
-    time_spent_hours INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
-);
-
 CREATE OR REPLACE TABLE difficulty_levels (
     difficulty_id INT PRIMARY KEY,
     name VARCHAR NOT NULL,
@@ -166,32 +98,6 @@ CREATE OR REPLACE TABLE stolen_items (
     item_name VARCHAR NOT NULL,
     category VARCHAR
 );
-
--- ============================================================================
--- VIEWS
--- ============================================================================
-
-CREATE OR REPLACE VIEW v_daily_active_users AS
-SELECT DATE(started_at) as play_date, COUNT(DISTINCT player_id) as dau
-FROM game_sessions GROUP BY 1 ORDER BY 1;
-
-CREATE OR REPLACE VIEW v_win_rate_by_difficulty AS
-SELECT ca.difficulty,
-    dl.name as difficulty_name,
-    COUNT(*) as total_cases, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
-FROM case_analytics ca
-LEFT JOIN difficulty_levels dl ON ca.difficulty = dl.difficulty_id
-GROUP BY ca.difficulty, dl.name 
-ORDER BY ca.difficulty;
-
--- Leaderboard: Lower score is better (like golf - based on AI credits used)
-CREATE OR REPLACE VIEW v_leaderboard AS
-SELECT p.snowflake_user, p.rank, p.cases_solved, 
-       MIN(hs.score) as best_score,  -- Lower is better
-       COUNT(hs.score) as games_won
-FROM players p LEFT JOIN high_scores hs ON p.player_id = hs.player_id
-GROUP BY 1, 2, 3 
-ORDER BY best_score ASC NULLS LAST;  -- Lower scores first
 
 -- ============================================================================
 -- SEED DATA: 100 CITIES
@@ -321,25 +227,6 @@ INSERT INTO suspects (suspect_id, name, hair_color, eye_color, hobby, vehicle, f
 ('sus_git', 'Git Blame', 'Red', 'Shifty brown', 'Pointing fingers', 'Branch-hopping vehicle', 'Blame game cookies', 'Never takes responsibility'),
 ('sus_cloud', 'Cloudy McFloatface', 'Wispy white', 'Sky blue', 'Weather manipulation', 'Hot air balloon', 'Cloud-shaped candy', 'Floats into cities unannounced'),
 ('sus_api', 'API Endpoint', 'Rainbow (changes daily)', 'REST-ful gray', 'Making connections', 'Any vehicle that requests', 'JSON-formatted food', 'Responds differently to everyone');
-
--- ============================================================================
--- SEED DATA: KEY LANDMARKS
--- ============================================================================
-
-INSERT INTO landmarks (landmark_id, location_id, name, landmark_type, clue_facts) VALUES
-('lm_eiffel', 'loc_paris', 'Eiffel Tower', 'monument', PARSE_JSON('["Built in 1889 for the Worlds Fair", "Made of iron and stands 330 meters tall", "Named after engineer Gustave Eiffel"]')),
-('lm_louvre', 'loc_paris', 'Louvre Museum', 'museum', PARSE_JSON('["Home to the Mona Lisa", "Was once a royal palace", "Largest art museum in the world"]')),
-('lm_bigben', 'loc_london', 'Big Ben', 'monument', PARSE_JSON('["The bell weighs 13.5 tons", "The clock tower is officially Elizabeth Tower", "Has been keeping time since 1859"]')),
-('lm_colosseum', 'loc_rome', 'Colosseum', 'ancient', PARSE_JSON('["Could hold 50,000 to 80,000 spectators", "Built in 70-80 AD", "Featured gladiator battles"]')),
-('lm_shibuya', 'loc_tokyo', 'Shibuya Crossing', 'urban', PARSE_JSON('["Busiest pedestrian crossing in the world", "Up to 3,000 people cross at once", "Featured in many films"]')),
-('lm_statue', 'loc_newyork', 'Statue of Liberty', 'monument', PARSE_JSON('["Gift from France in 1886", "Stands 93 meters including pedestal", "Located on Liberty Island"]')),
-('lm_operahouse', 'loc_sydney', 'Sydney Opera House', 'theater', PARSE_JSON('["Designed by Jorn Utzon", "Took 16 years to build", "UNESCO World Heritage Site"]')),
-('lm_pyramids', 'loc_cairo', 'Great Pyramids of Giza', 'ancient', PARSE_JSON('["Only remaining ancient wonder", "Great Pyramid built around 2560 BC", "Sphinx guards the complex"]')),
-('lm_christredeemer', 'loc_rio', 'Christ the Redeemer', 'monument', PARSE_JSON('["Stands 30 meters tall on Corcovado mountain", "Arms stretch 28 meters wide", "One of the New Seven Wonders"]')),
-('lm_forbiddencity', 'loc_beijing', 'Forbidden City', 'palace', PARSE_JSON('["Largest palace complex in the world", "Home to 24 emperors", "Has 9,999 rooms"]')),
-('lm_burjkhalifa', 'loc_dubai', 'Burj Khalifa', 'skyscraper', PARSE_JSON('["World tallest building at 828 meters", "163 floors", "Opened in 2010"]')),
-('lm_machupicchu', 'loc_cusco', 'Machu Picchu', 'ancient', PARSE_JSON('["15th century Inca citadel", "2,430 meters elevation", "New Seven Wonders of World"]')),
-('lm_yellowstone', 'loc_bozeman', 'Yellowstone National Park', 'park', PARSE_JSON('["First national park in the world", "Home to Old Faithful geyser", "Sits on a supervolcano"]'));
 
 -- ============================================================================
 -- SEED DATA: DIFFICULTY LEVELS
