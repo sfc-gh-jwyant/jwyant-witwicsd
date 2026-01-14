@@ -1476,53 +1476,29 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     """Render investigation screen."""
     result = {"action": None}
     
-    # Title
+    # Title and case header
     st.title(f"📍 {location.city}, {location.country}")
-    st.caption(f"{location.continent}")
     
-    # Header with case info
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    # Compact header with case info and time
+    diff_config = get_difficulty_config()
+    urgency = controller.get_urgency_level()
+    hours = controller.get_time_remaining()
     
-    with col1:
-        st.subheader("📋 Current Case")
-        st.write(f"**Stolen:** {case.stolen_item}")
-        diff_config = get_difficulty_config()
-        st.write(f"**Difficulty:** {diff_config[case.difficulty]['name']}")
+    # Time display with urgency coloring
+    if urgency == "critical":
+        time_html = f'<span style="color: #ff4b4b; font-weight: bold;">⏱️ {hours} hours remaining!</span>'
+    elif urgency == "warning":
+        time_html = f'<span style="color: #ffa726; font-weight: bold;">⏱️ {hours} hours remaining</span>'
+    else:
+        time_html = f'<span style="color: #4caf50;">⏱️ {hours} hours remaining</span>'
     
-    with col2:
-        urgency = controller.get_urgency_level()
-        if urgency == "critical":
-            st.error(f"⏱️ **{controller.get_time_remaining()} hours** remaining!")
-        elif urgency == "warning":
-            st.warning(f"⏱️ **{controller.get_time_remaining()} hours** remaining")
-        else:
-            st.success(f"⏱️ **{controller.get_time_remaining()} hours** remaining")
+    st.markdown(f"""
+    **Case:** {case.stolen_item} stolen! | 
+    **Difficulty:** {diff_config[case.difficulty]['name']} | 
+    **Rank:** {player.rank} | 
+    {time_html}
+    """, unsafe_allow_html=True)
     
-    with col3:
-        st.metric("Locations Visited", len(case.progress.locations_visited) if case.progress else 0)
-    
-    with col4:
-        st.metric("🤖 AI Prompts", player.ai_prompt_count)
-
-    with col5:
-        # Format token count with K suffix for thousands
-        tokens = player.ai_token_count
-        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
-        st.metric("🔢 AI Tokens", token_display)
-
-    with col6:
-        # Format credits with appropriate precision
-        credits = player.ai_credits_used
-        if credits >= 1.0:
-            credits_display = f"{credits:.2f}"
-        elif credits >= 0.001:
-            credits_display = f"{credits:.4f}"
-        else:
-            credits_display = f"{credits:.6f}"
-        st.metric("💰 AI Credits", credits_display)
-    
-
-
     st.divider()
     
     # Main content
@@ -1589,6 +1565,72 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     with col4:
         if st.button("🏠 MAIN MENU", use_container_width=True):
             result = {"action": "main_menu"}
+    
+    st.divider()
+    
+    # Current Case Metrics
+    st.markdown("##### 📊 Current Case Metrics")
+    case_cols = st.columns(5)
+    
+    with case_cols[0]:
+        urgency = controller.get_urgency_level()
+        hours = controller.get_time_remaining()
+        if urgency == "critical":
+            st.metric("⏱️ Hours Left", hours, delta=None, delta_color="inverse")
+        elif urgency == "warning":
+            st.metric("⏱️ Hours Left", hours)
+        else:
+            st.metric("⏱️ Hours Left", hours)
+    
+    with case_cols[1]:
+        st.metric("📍 Locations", len(case.progress.locations_visited) if case.progress else 0)
+    
+    with case_cols[2]:
+        case_prompts = case.progress.ai_prompts if case.progress else 0
+        st.metric("🤖 Prompts", case_prompts)
+    
+    with case_cols[3]:
+        case_tokens = case.progress.ai_tokens if case.progress else 0
+        token_display = f"{case_tokens // 1000}K" if case_tokens >= 1000 else str(case_tokens)
+        st.metric("🔢 Tokens", token_display)
+    
+    with case_cols[4]:
+        case_credits = case.progress.ai_credits if case.progress else 0.0
+        if case_credits >= 1.0:
+            credits_display = f"{case_credits:.2f}"
+        elif case_credits >= 0.001:
+            credits_display = f"{case_credits:.4f}"
+        else:
+            credits_display = f"{case_credits:.6f}"
+        st.metric("💰 Credits", credits_display)
+    
+    # Player Cumulative Metrics
+    st.markdown("##### 🎮 Player Lifetime Stats")
+    player_cols = st.columns(5)
+    
+    with player_cols[0]:
+        st.metric("🏆 Cases Solved", player.cases_solved)
+    
+    with player_cols[1]:
+        st.metric("⭐ Total Score", player.total_score)
+    
+    with player_cols[2]:
+        st.metric("🤖 Total Prompts", player.ai_prompt_count)
+    
+    with player_cols[3]:
+        tokens = player.ai_token_count
+        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
+        st.metric("🔢 Total Tokens", token_display)
+    
+    with player_cols[4]:
+        credits = player.ai_credits_used
+        if credits >= 1.0:
+            credits_display = f"{credits:.2f}"
+        elif credits >= 0.001:
+            credits_display = f"{credits:.4f}"
+        else:
+            credits_display = f"{credits:.6f}"
+        st.metric("💰 Total Credits", credits_display)
     
     return result
 
