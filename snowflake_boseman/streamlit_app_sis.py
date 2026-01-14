@@ -1263,7 +1263,7 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
 def get_stage_image_base64(location_id: str) -> Optional[str]:
     """
     Get a location image from the stage as a base64 data URL.
-    Used for CSS background-image which needs a browser-accessible URL.
+    Uses MEDIA_STAGE/{location_id}.jpg or .png
     
     Returns None if image not found.
     """
@@ -1291,14 +1291,17 @@ def get_stage_image_base64(location_id: str) -> Optional[str]:
     return None
 
 
-def apply_background_image(image_url: Optional[str], opacity: float = 0.25):
+def apply_background_image(location_id: str, opacity: float = 0.25):
     """
-    Apply a background image to the app using CSS.
+    Apply a city background image using CSS.
+    Loads image from MEDIA_STAGE/{location_id}.jpg or .png
     
     Args:
-        image_url: The image URL (can be http, data:, or None)
+        location_id: The location ID (e.g., "loc_paris")
         opacity: Background opacity (0.0 to 1.0)
     """
+    image_url = get_stage_image_base64(location_id)
+    
     if not image_url:
         return
     
@@ -1443,12 +1446,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     """Render investigation screen."""
     result = {"action": None}
     
-    # Apply city image as background
-    bg_image_url = location.image_url
-    if not bg_image_url:
-        # Try to get image from stage as base64
-        bg_image_url = get_stage_image_base64(location.id)
-    apply_background_image(bg_image_url, opacity=0.25)
+    # Apply city image as CSS background from stage
+    apply_background_image(location.id, opacity=0.25)
     
     # Title
     st.title(f"📍 {location.city}, {location.country}")
@@ -1485,7 +1484,16 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     with col_left:
         st.subheader(f"🏙️ Welcome to {location.city}")
         
-        # City image is displayed as background via CSS
+        # Display city image from stage
+        if location.image_url:
+            # If image_url is set, use it directly
+            try:
+                st.image(location.image_url, caption=f"{location.city}, {location.country}", use_container_width=True)
+            except:
+                render_stage_image(location.id, f"{location.city}, {location.country}")
+        else:
+            # Try to load from stage using location_id
+            render_stage_image(location.id, f"{location.city}, {location.country}")
         
         if location.description:
             st.info(location.description)
