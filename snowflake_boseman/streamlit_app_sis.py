@@ -1544,7 +1544,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         
         # Generate dynamic city description with AI
         city_desc = get_dynamic_city_description(controller, location)
-        st.info(city_desc)
+        st.info(city_desc.strip('"\\'))
     
     with col_right:
         st.subheader("📔 Clue Notebook")
@@ -1642,6 +1642,36 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
             "travel_time": current_location.get_travel_time_to(loc),
         } for loc in destinations])
         
+        # Build travel path lines from visited locations
+        visited_ids = case.progress.locations_visited if case.progress else []
+        path_data = []
+        if len(visited_ids) > 1:
+            for i in range(len(visited_ids) - 1):
+                from_loc = controller.get_location_by_id(visited_ids[i])
+                to_loc = controller.get_location_by_id(visited_ids[i + 1])
+                if from_loc and to_loc:
+                    path_data.append({
+                        "from_lon": from_loc.longitude,
+                        "from_lat": from_loc.latitude,
+                        "to_lon": to_loc.longitude,
+                        "to_lat": to_loc.latitude,
+                        "from_city": from_loc.city,
+                        "to_city": to_loc.city,
+                    })
+        
+        # Visited cities markers (excluding current - already shown in red)
+        visited_cities = []
+        for loc_id in visited_ids[:-1]:  # All except current (last one)
+            loc = controller.get_location_by_id(loc_id)
+            if loc:
+                visited_cities.append({
+                    "name": f"✓ {loc.city}",
+                    "city": loc.city,
+                    "lat": loc.latitude,
+                    "lon": loc.longitude,
+                })
+        visited_df = pd.DataFrame(visited_cities) if visited_cities else pd.DataFrame()
+        
         # Calculate center point for initial view
         all_lats = [current_location.latitude] + [loc.latitude for loc in destinations]
         all_lons = [current_location.longitude] + [loc.longitude for loc in destinations]
@@ -1649,6 +1679,46 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         center_lon = sum(all_lons) / len(all_lons)
         
         # Create pydeck layers
+        layers = []
+        
+        # Travel path lines - orange/gold dashed effect
+        if path_data:
+            path_df = pd.DataFrame(path_data)
+            path_layer = pdk.Layer(
+                "LineLayer",
+                data=path_df,
+                get_source_position=["from_lon", "from_lat"],
+                get_target_position=["to_lon", "to_lat"],
+                get_color=[255, 193, 7, 200],  # Gold/amber
+                get_width=3,
+                pickable=False,
+            )
+            layers.append(path_layer)
+        
+        # Visited cities - smaller gray markers
+        if not visited_df.empty:
+            visited_layer = pdk.Layer(
+                "ScatterplotLayer",
+                data=visited_df,
+                get_position=["lon", "lat"],
+                get_radius=50000,
+                get_fill_color=[158, 158, 158, 180],  # Gray
+                pickable=False,
+            )
+            visited_text_layer = pdk.Layer(
+                "TextLayer",
+                data=visited_df,
+                get_position=["lon", "lat"],
+                get_text="name",
+                get_size=10,
+                get_color=[200, 200, 200],
+                get_angle=0,
+                get_text_anchor="'middle'",
+                get_alignment_baseline="'bottom'",
+                get_pixel_offset=[0, -10],
+            )
+            layers.extend([visited_layer, visited_text_layer])
+        
         # Current location - red marker
         current_layer = pdk.Layer(
             "ScatterplotLayer",
@@ -1658,6 +1728,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
             get_fill_color=[255, 107, 107, 200],  # Red
             pickable=False,
         )
+        layers.append(current_layer)
         
         # Current location label
         current_text_layer = pdk.Layer(
@@ -1672,6 +1743,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
             get_alignment_baseline="'bottom'",
             get_pixel_offset=[0, -15],
         )
+        layers.append(current_text_layer)
         
         # Destination markers - teal
         dest_layer = pdk.Layer(
@@ -1683,6 +1755,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
             pickable=True,
             auto_highlight=True,
         )
+        layers.append(dest_layer)
         
         # Destination labels
         dest_text_layer = pdk.Layer(
@@ -1697,6 +1770,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
             get_alignment_baseline="'bottom'",
             get_pixel_offset=[0, -12],
         )
+        layers.append(dest_text_layer)
         
         # Create the deck
         view_state = pdk.ViewState(
@@ -1707,7 +1781,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         )
         
         deck = pdk.Deck(
-            layers=[current_layer, dest_layer, current_text_layer, dest_text_layer],
+            layers=layers,
             initial_view_state=view_state,
             map_style="dark",  # Built-in style: "dark", "light", "road", "satellite"
             tooltip={"text": "{city}\n⏱️ {travel_time} hrs"},
@@ -1717,7 +1791,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
         st.pydeck_chart(deck)
         
         # Legend
-        st.caption("🔴 Your location | 🔵 Click a destination on the right to travel")
+        st.caption("🔴 Your location | ⚪ Visited | 🟡 Travel path | 🔵 Click a destination on the right")
     
     with col_list:
         st.subheader("✈️ Fly To:")
