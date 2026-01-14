@@ -47,26 +47,3 @@ INSERT INTO cortex_credit_rates (model_name, credits_per_million_input_tokens, c
 
 -- DeepSeek models
 ('deepseek-r1', 0.55, 2.19, 'DeepSeek', 'DeepSeek R1 reasoning model');
-
--- Create a view to calculate estimated costs for the game
-CREATE OR REPLACE VIEW v_ai_cost_estimates AS
-SELECT 
-    p.snowflake_user,
-    p.ai_prompt_count,
-    p.ai_token_count,
-    ROUND(p.ai_token_count / 1000000.0 * 1.21, 4) as estimated_credits_llama70b,
-    ROUND(p.ai_token_count / 1000000.0 * 0.19, 4) as estimated_credits_llama8b
-FROM players p
-ORDER BY p.ai_token_count DESC;
-
--- View to show cost breakdown by model
-CREATE OR REPLACE VIEW v_cortex_model_costs AS
-SELECT 
-    model_name,
-    model_provider,
-    credits_per_million_input_tokens as input_credits_per_1m,
-    credits_per_million_output_tokens as output_credits_per_1m,
-    (credits_per_million_input_tokens + credits_per_million_output_tokens) / 2 as avg_credits_per_1m,
-    notes
-FROM cortex_credit_rates
-ORDER BY avg_credits_per_1m;
