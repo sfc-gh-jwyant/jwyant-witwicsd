@@ -1302,14 +1302,14 @@ def apply_theme():
         font-size: 0.85rem !important;
     }
     
-    /* City images - proper sizing */
+    /* City images - 720x480 sizing */
     .stImage {
         margin-bottom: 0.25rem !important;
     }
     
     .stImage img {
-        min-width: 720px !important;
-        max-height: 300px !important;
+        width: 720px !important;
+        height: 480px !important;
         object-fit: cover;
     }
     
