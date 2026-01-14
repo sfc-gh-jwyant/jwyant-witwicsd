@@ -1196,22 +1196,48 @@ def apply_theme():
     }
     
     .main .block-container {
-        padding-top: 2rem;
-        max-width: 1200px;
+        padding-top: 0.5rem !important;
+        padding-bottom: 0.5rem !important;
+        max-width: 1400px;
+    }
+    
+    /* Reduce spacing between elements */
+    .element-container {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    /* Compact dividers */
+    hr {
+        margin: 0.5rem 0 !important;
     }
     
     h1, h2, h3, h4, h5, h6 {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
         color: var(--snowflake-blue) !important;
         font-weight: 600 !important;
+        margin-bottom: 0.25rem !important;
     }
     
     h1 {
-        font-size: 2.5rem !important;
+        font-size: 1.8rem !important;
         background: linear-gradient(90deg, var(--snowflake-blue), #56CCF2);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
+        margin-top: 0 !important;
+    }
+    
+    h2 {
+        font-size: 1.3rem !important;
+    }
+    
+    h3, .stSubheader {
+        font-size: 1.1rem !important;
+    }
+    
+    h5 {
+        font-size: 0.9rem !important;
+        margin-top: 0.25rem !important;
     }
     
     p, div, span, label, li {
@@ -1254,14 +1280,58 @@ def apply_theme():
         border-color: var(--snowflake-blue);
     }
     
-    /* Metrics */
+    /* Metrics - compact */
     [data-testid="stMetricValue"] {
         color: var(--snowflake-blue) !important;
         font-weight: 700 !important;
+        font-size: 1.2rem !important;
     }
     
     [data-testid="stMetricLabel"] {
         color: var(--snowflake-light) !important;
+        font-size: 0.75rem !important;
+    }
+    
+    [data-testid="stMetric"] {
+        padding: 0.25rem !important;
+    }
+    
+    /* Compact buttons */
+    .stButton > button {
+        padding: 0.4rem 0.8rem !important;
+        font-size: 0.85rem !important;
+    }
+    
+    /* Compact images - limit height */
+    .stImage {
+        margin-bottom: 0.25rem !important;
+    }
+    
+    .stImage img {
+        max-height: 250px !important;
+        object-fit: cover;
+    }
+    
+    /* Info boxes compact */
+    .stAlert {
+        padding: 0.5rem !important;
+        margin-bottom: 0.25rem !important;
+    }
+    
+    .stAlert p {
+        font-size: 0.85rem !important;
+        margin: 0 !important;
+    }
+    
+    /* Expanders compact */
+    .streamlit-expanderHeader {
+        padding: 0.25rem !important;
+        font-size: 0.85rem !important;
+    }
+    
+    /* Column gaps */
+    [data-testid="column"] {
+        padding: 0 0.25rem !important;
     }
     
     /* Info/Warning/Error boxes */
@@ -1552,13 +1622,15 @@ def render_investigation(controller: GameController, case: Case, location: Locat
                     clues_by_city[city] = []
                 clues_by_city[city].append(clue)
             
-            # Display clues grouped by city
+            # Display clues in a scrollable container
+            clue_html = '<div style="max-height: 280px; overflow-y: auto; padding-right: 0.5rem;">'
             for city, city_clues in clues_by_city.items():
-                st.markdown(f"**{city}:**")
+                clue_html += f'<p style="margin-bottom: 0.25rem;"><b>{city}:</b></p>'
                 for clue in city_clues:
-                    # Clean up any escaped or extra quotes from AI response
                     clean_text = clue.text.strip('"\\')
-                    st.text(f'"{clean_text}"')
+                    clue_html += f'<p style="font-size: 0.85rem; margin: 0.25rem 0; padding-left: 0.5rem; border-left: 2px solid #29B5E8;">"{clean_text}"</p>'
+            clue_html += '</div>'
+            st.markdown(clue_html, unsafe_allow_html=True)
         else:
             st.info("No clues yet. Investigate to gather clues!")
     
@@ -1583,71 +1655,28 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         if st.button("🏠 MAIN MENU", use_container_width=True):
             result = {"action": "main_menu"}
     
-    st.divider()
+    # Compact metrics bar - all in one row
+    st.markdown("---")
     
-    # Current Case Metrics
-    st.markdown("##### 📊 Current Case Metrics")
-    case_cols = st.columns(5)
+    # Format values
+    case_locs = len(case.progress.locations_visited) if case.progress else 0
+    case_prompts = case.progress.ai_prompts if case.progress else 0
+    case_tokens = case.progress.ai_tokens if case.progress else 0
+    case_tok_str = f"{case_tokens // 1000}K" if case_tokens >= 1000 else str(case_tokens)
+    case_credits = case.progress.ai_credits if case.progress else 0.0
+    case_cred_str = f"{case_credits:.4f}" if case_credits < 1 else f"{case_credits:.2f}"
     
-    with case_cols[0]:
-        urgency = controller.get_urgency_level()
-        hours = controller.get_time_remaining()
-        if urgency == "critical":
-            st.metric("⏱️ Hours Left", hours, delta=None, delta_color="inverse")
-        elif urgency == "warning":
-            st.metric("⏱️ Hours Left", hours)
-        else:
-            st.metric("⏱️ Hours Left", hours)
+    player_tok = player.ai_token_count
+    player_tok_str = f"{player_tok // 1000}K" if player_tok >= 1000 else str(player_tok)
+    player_cred = player.ai_credits_used
+    player_cred_str = f"{player_cred:.4f}" if player_cred < 1 else f"{player_cred:.2f}"
     
-    with case_cols[1]:
-        st.metric("📍 Locations", len(case.progress.locations_visited) if case.progress else 0)
-    
-    with case_cols[2]:
-        case_prompts = case.progress.ai_prompts if case.progress else 0
-        st.metric("🤖 Prompts", case_prompts)
-    
-    with case_cols[3]:
-        case_tokens = case.progress.ai_tokens if case.progress else 0
-        token_display = f"{case_tokens // 1000}K" if case_tokens >= 1000 else str(case_tokens)
-        st.metric("🔢 Tokens", token_display)
-    
-    with case_cols[4]:
-        case_credits = case.progress.ai_credits if case.progress else 0.0
-        if case_credits >= 1.0:
-            credits_display = f"{case_credits:.2f}"
-        elif case_credits >= 0.001:
-            credits_display = f"{case_credits:.4f}"
-        else:
-            credits_display = f"{case_credits:.6f}"
-        st.metric("💰 Credits", credits_display)
-    
-    # Player Cumulative Metrics
-    st.markdown("##### 🎮 Player Lifetime Stats")
-    player_cols = st.columns(5)
-    
-    with player_cols[0]:
-        st.metric("🏆 Cases Solved", player.cases_solved)
-    
-    with player_cols[1]:
-        st.metric("⭐ Total Score", player.total_score)
-    
-    with player_cols[2]:
-        st.metric("🤖 Total Prompts", player.ai_prompt_count)
-    
-    with player_cols[3]:
-        tokens = player.ai_token_count
-        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
-        st.metric("🔢 Total Tokens", token_display)
-    
-    with player_cols[4]:
-        credits = player.ai_credits_used
-        if credits >= 1.0:
-            credits_display = f"{credits:.2f}"
-        elif credits >= 0.001:
-            credits_display = f"{credits:.4f}"
-        else:
-            credits_display = f"{credits:.6f}"
-        st.metric("💰 Total Credits", credits_display)
+    st.markdown(f"""
+    <div style="display: flex; justify-content: space-between; font-size: 0.8rem; padding: 0.5rem; background: rgba(41, 181, 232, 0.1); border-radius: 8px;">
+        <div><b>📊 This Case:</b> 📍 {case_locs} locations | 🤖 {case_prompts} prompts | 🔢 {case_tok_str} tokens | 💰 {case_cred_str} credits</div>
+        <div><b>🎮 Lifetime:</b> 🏆 {player.cases_solved} solved | ⭐ {player.total_score} pts | 🤖 {player.ai_prompt_count} prompts | 🔢 {player_tok_str} tokens | 💰 {player_cred_str} credits</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     return result
 
