@@ -1434,7 +1434,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     st.caption(f"{location.continent}")
     
     # Header with case info
-    col1, col2, col3, col4, col5 = st.columns(5)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
     
     with col1:
         st.subheader("📋 Current Case")
@@ -1457,14 +1457,6 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         st.metric("🤖 AI Prompts", player.ai_prompt_count)
     
     with col5:
-        # Format token count with K suffix for thousands
-        tokens = player.ai_token_count
-        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
-        st.metric("🔢 AI Tokens", token_display)
-    
-    # Add a second row for credits
-    col_credits, col_spacer1, col_spacer2, col_spacer3, col_spacer4 = st.columns(5)
-    with col_credits:
         # Format credits with appropriate precision
         credits = player.ai_credits_used
         if credits >= 1.0:
@@ -1475,6 +1467,12 @@ def render_investigation(controller: GameController, case: Case, location: Locat
             credits_display = f"{credits:.6f}"
         st.metric("💰 AI Credits", credits_display)
     
+    with col6:
+        # Format token count with K suffix for thousands
+        tokens = player.ai_token_count
+        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
+        st.metric("🔢 AI Tokens", token_display)
+
     st.divider()
     
     # Main content
