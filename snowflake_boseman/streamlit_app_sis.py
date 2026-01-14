@@ -1291,14 +1291,14 @@ def get_stage_image_base64(location_id: str) -> Optional[str]:
     return None
 
 
-def apply_background_image(location_id: str, opacity: float = 0.25):
+def apply_background_image(location_id: str):
     """
     Apply a city background image using CSS.
     Loads image from MEDIA_STAGE/{location_id}.jpg or .png
+    Background is 100% opaque, UI elements float on top with semi-transparent backgrounds.
     
     Args:
         location_id: The location ID (e.g., "loc_paris")
-        opacity: Background opacity (0.0 to 1.0)
     """
     image_url = get_stage_image_base64(location_id)
     
@@ -1307,36 +1307,85 @@ def apply_background_image(location_id: str, opacity: float = 0.25):
     
     st.markdown(f"""
     <style>
-    /* City background image */
-    .stApp::before {{
-        content: "";
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background-image: url('{image_url}');
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-        opacity: {opacity};
-        z-index: -1;
-        pointer-events: none;
+    /* City background image - 100% opaque, covers entire viewport */
+    .stApp {{
+        background-image: url('{image_url}') !important;
+        background-size: cover !important;
+        background-position: center !important;
+        background-repeat: no-repeat !important;
+        background-attachment: fixed !important;
     }}
     
-    /* Semi-transparent containers for readability */
-    [data-testid="stVerticalBlock"] > div {{
+    /* Main content area - semi-transparent to show background */
+    .stApp > header {{
+        background: rgba(13, 27, 42, 0.85) !important;
+        backdrop-filter: blur(10px);
+    }}
+    
+    /* All main containers - semi-transparent dark overlay */
+    [data-testid="stAppViewContainer"] {{
+        background: transparent !important;
+    }}
+    
+    [data-testid="stMain"] {{
+        background: transparent !important;
+    }}
+    
+    /* Content blocks get semi-transparent background */
+    [data-testid="stVerticalBlock"] {{
+        background: rgba(13, 27, 42, 0.75);
+        backdrop-filter: blur(8px);
+        border-radius: 12px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+    }}
+    
+    /* Columns container */
+    [data-testid="column"] {{
+        background: rgba(13, 27, 42, 0.6);
+        backdrop-filter: blur(5px);
+        border-radius: 8px;
+        padding: 0.75rem;
+        border: 1px solid rgba(41, 181, 232, 0.2);
+    }}
+    
+    /* Info/warning/success boxes */
+    [data-testid="stAlert"] {{
+        background: rgba(13, 27, 42, 0.8) !important;
+        backdrop-filter: blur(8px);
+    }}
+    
+    /* Metrics */
+    [data-testid="stMetric"] {{
         background: rgba(13, 27, 42, 0.7);
         backdrop-filter: blur(5px);
         border-radius: 8px;
         padding: 0.5rem;
     }}
     
-    /* Keep buttons fully opaque */
+    /* Buttons remain fully opaque and visible */
     .stButton > button {{
+        background: linear-gradient(135deg, #29B5E8 0%, #1E88E5 100%) !important;
         opacity: 1 !important;
+        position: relative;
+        z-index: 10;
+    }}
+    
+    /* Selectboxes and inputs */
+    [data-testid="stSelectbox"], 
+    [data-testid="stTextInput"] {{
+        background: rgba(13, 27, 42, 0.8);
+        backdrop-filter: blur(5px);
+        border-radius: 8px;
+    }}
+    
+    /* Sidebar if present */
+    [data-testid="stSidebar"] {{
+        background: rgba(13, 27, 42, 0.9) !important;
+        backdrop-filter: blur(10px);
     }}
     </style>
+    """, unsafe_allow_html=True)
     """, unsafe_allow_html=True)
 
 
@@ -1446,8 +1495,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     """Render investigation screen."""
     result = {"action": None}
     
-    # Apply city image as CSS background from stage
-    apply_background_image(location.id, opacity=0.25)
+    # Apply city image as CSS background from stage (100% opaque, UI floats on top)
+    apply_background_image(location.id)
     
     # Title
     st.title(f"📍 {location.city}, {location.country}")
