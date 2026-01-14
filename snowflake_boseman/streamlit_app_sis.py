@@ -1575,52 +1575,6 @@ class GameState(Enum):
 # PAGES
 # =============================================================================
 
-def render_splash_image():
-    """Render 720x480 splash image from stage or placeholder."""
-    extensions = ["png", "jpeg", "jpg"]
-    session = get_snowflake_session()
-    
-    for ext in extensions:
-        try:
-            image_path = f'{MEDIA_STAGE}/splash.{ext}'
-            try:
-                result = session.file.get(image_path, "/tmp/")
-                local_path = f"/tmp/splash.{ext}"
-                st.image(local_path, use_container_width=True)
-                return True
-            except:
-                try:
-                    st.image(image_path, use_container_width=True)
-                    return True
-                except:
-                    pass
-        except:
-            continue
-    
-    # Fallback placeholder
-    st.markdown("""
-    <div style="width: 100%; max-width: 720px; height: 480px; margin: 0 auto;
-                background: linear-gradient(135deg, #0D1B2A 0%, #11567F 50%, #29B5E8 100%);
-                border: 3px solid #29B5E8; border-radius: 12px;
-                display: flex; flex-direction: column; align-items: center; justify-content: center;
-                box-shadow: 0 8px 32px rgba(41, 181, 232, 0.3);">
-        <h1 style="color: #FFFFFF; font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin: 0;">
-            🔍 WHERE IN THE WORLD IS 🔍
-        </h1>
-        <h2 style="color: #29B5E8; font-size: 2rem; margin: 10px 0;">
-            SNOWFLAKE BOSEMAN MONTANA?
-        </h2>
-        <p style="color: #E8F4F8; font-size: 1.2rem; margin-top: 20px;">
-            🌍 A Geography Mystery Adventure 🕵️
-        </p>
-        <p style="color: #6B7280; font-size: 0.9rem; margin-top: 30px;">
-            [ splash.png placeholder - 720x480 ]
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
-    return False
-
-
 def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     """Render main menu."""
     result = {"action": None}
@@ -1629,8 +1583,8 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     st.title("🔍 Where in the World is Snowflake Boseman Montana? 🔍")
     st.subheader("A geography mystery adventure")
     
-    # Splash image (720x480)
-    render_splash_image()
+    # Splash image (720x480) - uses main_splash.png/jpg from stage
+    render_stage_image("main_splash", "Where in the World is Snowflake Boseman Montana?")
     
     st.divider()
     
