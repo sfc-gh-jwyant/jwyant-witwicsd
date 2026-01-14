@@ -1,7 +1,6 @@
 -- Migration: Add difficulty_levels table
 -- Run this if you have an existing database without this table
 
--- Create the difficulty_levels table
 CREATE TABLE IF NOT EXISTS difficulty_levels (
     difficulty_id INT PRIMARY KEY,
     name VARCHAR NOT NULL,
@@ -14,18 +13,13 @@ CREATE TABLE IF NOT EXISTS difficulty_levels (
     decoy_destinations INT NOT NULL
 );
 
--- Insert difficulty levels (use MERGE to avoid duplicates)
-MERGE INTO difficulty_levels d
-USING (
-    SELECT 1 as difficulty_id, 'SELECT * FROM clues' as name, 'All clues visible, lots of time' as description, 72 as time_budget_hours, 'obvious' as clue_clarity, 3 as min_locations, 4 as max_locations, 0 as red_herrings, 2 as decoy_destinations
-    UNION ALL SELECT 2, 'WITH (NOLOCK)', 'Clear hints, moderate challenge', 48, 'clear', 4, 5, 1, 3
-    UNION ALL SELECT 3, 'Foreign Key Violation', 'Cryptic clues, tighter deadline', 36, 'cryptic', 5, 7, 2, 5
-    UNION ALL SELECT 4, 'Deadlock Victim', 'Very cryptic, time pressure', 24, 'very_cryptic', 6, 8, 3, 7
-    UNION ALL SELECT 5, 'Little Bobby Tables', 'Expert mode - riddles only', 12, 'riddle', 8, 10, 4, 10
-) src
-ON d.difficulty_id = src.difficulty_id
-WHEN NOT MATCHED THEN INSERT (difficulty_id, name, description, time_budget_hours, clue_clarity, min_locations, max_locations, red_herrings, decoy_destinations)
-VALUES (src.difficulty_id, src.name, src.description, src.time_budget_hours, src.clue_clarity, src.min_locations, src.max_locations, src.red_herrings, src.decoy_destinations);
+-- Insert difficulty levels
+INSERT INTO difficulty_levels (difficulty_id, name, description, time_budget_hours, clue_clarity, min_locations, max_locations, red_herrings, decoy_destinations) VALUES
+(1, 'SELECT * FROM clues', 'All clues visible, lots of time', 72, 'obvious', 3, 4, 0, 2),
+(2, 'WITH (NOLOCK)', 'Clear hints, moderate challenge', 48, 'clear', 4, 5, 1, 3),
+(3, 'Foreign Key Violation', 'Cryptic clues, tighter deadline', 36, 'cryptic', 5, 7, 2, 5),
+(4, 'Deadlock Victim', 'Very cryptic, time pressure', 24, 'very_cryptic', 6, 8, 3, 7),
+(5, 'Little Bobby Tables', 'Expert mode - riddles only', 12, 'riddle', 8, 10, 4, 10);
 
 -- Update the view to use the new table
 CREATE OR REPLACE VIEW v_win_rate_by_difficulty AS
