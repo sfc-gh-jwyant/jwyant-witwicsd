@@ -184,10 +184,14 @@ LEFT JOIN difficulty_levels dl ON ca.difficulty = dl.difficulty_id
 GROUP BY ca.difficulty, dl.name 
 ORDER BY ca.difficulty;
 
+-- Leaderboard: Lower score is better (like golf - based on AI credits used)
 CREATE OR REPLACE VIEW v_leaderboard AS
-SELECT p.snowflake_user, p.rank, p.cases_solved, p.total_score, MAX(hs.score) as best_score
+SELECT p.snowflake_user, p.rank, p.cases_solved, 
+       MIN(hs.score) as best_score,  -- Lower is better
+       COUNT(hs.score) as games_won
 FROM players p LEFT JOIN high_scores hs ON p.player_id = hs.player_id
-GROUP BY 1, 2, 3, 4 ORDER BY p.total_score DESC;
+GROUP BY 1, 2, 3 
+ORDER BY best_score ASC NULLS LAST;  -- Lower scores first
 
 -- ============================================================================
 -- SEED DATA: 100 CITIES

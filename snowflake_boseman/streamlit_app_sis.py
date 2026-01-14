@@ -1114,7 +1114,9 @@ Generate ONLY the witness quote, nothing else."""
             score = self._calculate_score(case)
             
             self._current_player.cases_solved += 1
-            self._current_player.total_score += score
+            # Lower score is better (like golf) - track best score
+            if self._current_player.total_score == 0 or score < self._current_player.total_score:
+                self._current_player.total_score = score
             self._current_player.update_rank()
             self._update_player_stats(self._current_player)
             
@@ -1124,7 +1126,7 @@ Generate ONLY the witness quote, nothing else."""
             
             return {
                 "won": True,
-                "message": f"You caught {case.suspect.name}! Case solved!",
+                "message": f"You caught {case.suspect.name}! Case solved! Your score: {score:,} (lower is better, like golf!)",
                 "score": score,
                 "game_over": True,  # Case is complete, return to menu
             }
@@ -1147,12 +1149,17 @@ Generate ONLY the witness quote, nothing else."""
                 "game_over": True,
             }
     
-    def _calculate_score(self, case: Case) -> int:
-        """Calculate score for completed case."""
-        multiplier = {1: 1, 2: 2, 3: 4, 4: 8, 5: 16}
-        time_bonus = max(0, self._time_manager.hours_remaining) * 100
-        efficiency = max(0, 10 - len(case.progress.locations_visited)) * 50
-        return (time_bonus + efficiency) * multiplier.get(case.difficulty, 1)
+    def _calculate_score(self, case: Case) -> float:
+        """Calculate score for completed case.
+        
+        Score is based on AI credits used - lower is better (like golf).
+        Credits = tokens * rate per million tokens for the model used.
+        """
+        if case.progress:
+            # Score is AI credits used (already calculated during gameplay)
+            # Multiply by 1000000 to get a readable number, round to int
+            return round(case.progress.ai_credits * 1000000)
+        return 0
     
     def _update_player_stats(self, player: Player) -> bool:
         """Update player stats in the database."""
