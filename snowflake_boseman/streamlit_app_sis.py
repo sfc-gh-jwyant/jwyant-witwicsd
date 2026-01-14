@@ -683,6 +683,7 @@ class GameController:
         
         if self._time_manager.is_time_up:
             case.status = CaseStatus.LOST_TIME
+            self._save_case_analytics(case, "lost_time")
             return {
                 "success": True,
                 "message": "Time has run out! The suspect escaped.",
@@ -1117,6 +1118,10 @@ Generate ONLY the witness quote, nothing else."""
             self._current_player.update_rank()
             self._update_player_stats(self._current_player)
             
+            # Save analytics and high score
+            self._save_case_analytics(case, "won")
+            self._save_high_score(case, score)
+            
             return {
                 "won": True,
                 "message": f"You caught {case.suspect.name}! Case solved!",
@@ -1126,6 +1131,7 @@ Generate ONLY the witness quote, nothing else."""
         elif not is_at_location:
             # Wrong location - game over
             case.status = CaseStatus.LOST_WRONG_ARREST
+            self._save_case_analytics(case, "lost_wrong_arrest")
             return {
                 "won": False,
                 "message": f"The suspect isn't here! While you searched the wrong city, {case.suspect.name} escaped!",
@@ -1134,6 +1140,7 @@ Generate ONLY the witness quote, nothing else."""
         else:
             # Wrong suspect - game over
             case.status = CaseStatus.LOST_WRONG_ARREST
+            self._save_case_analytics(case, "lost_wrong_arrest")
             return {
                 "won": False,
                 "message": f"Wrong suspect! While you arrested the wrong person, {case.suspect.name} got away!",
@@ -1156,6 +1163,61 @@ Generate ONLY the witness quote, nothing else."""
                     total_score = {player.total_score},
                     rank = '{player.rank}'
                 WHERE player_id = '{player.id}'
+            """)
+            return True
+        except Exception as e:
+            print(f"Error updating player stats: {e}")
+            return False
+    
+    def _save_case_analytics(self, case: Case, outcome: str) -> bool:
+        """Save case analytics to database."""
+        try:
+            progress = case.progress
+            diff_config = get_difficulty_config()
+            time_budget = diff_config[case.difficulty]["time_budget"]
+            time_used = time_budget - (self._time_manager.hours_remaining if self._time_manager else 0)
+            
+            execute_write(f"""
+                INSERT INTO {TABLE_PREFIX}case_analytics (
+                    case_id, player_id, difficulty, outcome,
+                    total_locations_in_path, locations_visited,
+                    correct_travels, wrong_travels, clues_gathered,
+                    time_budget_hours, time_used_hours,
+                    ai_prompts, ai_tokens, ai_credits, ai_model,
+                    started_at, ended_at
+                ) VALUES (
+                    '{case.id}', '{case.player_id}', {case.difficulty}, '{outcome}',
+                    {len(case.location_path)}, {len(progress.locations_visited) if progress else 0},
+                    {progress.correct_travels if progress else 0}, {progress.wrong_travels if progress else 0},
+                    {len(progress.clues_gathered) if progress else 0},
+                    {time_budget}, {time_used},
+                    {progress.ai_prompts if progress else 0}, {progress.ai_tokens if progress else 0},
+                    {progress.ai_credits if progress else 0.0}, '{progress.ai_model if progress and progress.ai_model else "unknown"}',
+                    CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()
+                )
+            """)
+            return True
+        except Exception as e:
+            print(f"Error saving case analytics: {e}")
+            return False
+    
+    def _save_high_score(self, case: Case, score: int) -> bool:
+        """Save high score to database."""
+        try:
+            progress = case.progress
+            diff_config = get_difficulty_config()
+            time_budget = diff_config[case.difficulty]["time_budget"]
+            completion_time = time_budget - (self._time_manager.hours_remaining if self._time_manager else 0)
+            
+            score_id = f"score_{uuid.uuid4().hex[:12]}"
+            execute_write(f"""
+                INSERT INTO {TABLE_PREFIX}high_scores (
+                    score_id, player_id, case_id, difficulty,
+                    completion_time_hours, locations_visited, score
+                ) VALUES (
+                    '{score_id}', '{case.player_id}', '{case.id}', {case.difficulty},
+                    {completion_time}, {len(progress.locations_visited) if progress else 0}, {score}
+                )
             """)
             return True
         except Exception as e:
@@ -2098,6 +2160,7 @@ def main():
             # Check if time has run out
             if controller.get_time_remaining() <= 0:
                 case.status = CaseStatus.LOST_TIME
+                controller._save_case_analytics(case, "lost_time")
                 st.session_state.case_result = {
                     "won": False,
                     "message": "Time ran out! The suspect escaped!",
