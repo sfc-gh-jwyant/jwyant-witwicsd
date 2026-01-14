@@ -588,7 +588,7 @@ class GameController:
         return available
     
     def get_travel_options(self) -> List[Location]:
-        """Get limited travel options: correct destination + decoys based on difficulty."""
+        """Get limited travel options: previous city first, then correct destination + decoys."""
         case = self.get_current_case()
         current = self.get_current_location()
         if not case or not current:
@@ -606,21 +606,38 @@ class GameController:
         config = diff_config.get(case.difficulty, diff_config[3])
         num_decoys = config.get("decoy_destinations", 5)
         
-        # Build options list
+        # Find the previous city (second to last in visited list)
+        visited = case.progress.locations_visited if case.progress else []
+        previous_location = None
+        if len(visited) >= 2:
+            prev_id = visited[-2]  # Second to last is where we came from
+            previous_location = self.get_location_by_id(prev_id)
+        
+        # Build options list (excluding previous city, we'll add it first later)
         options = []
+        excluded_ids = {current.id}  # Don't include current location
+        if previous_location:
+            excluded_ids.add(previous_location.id)  # Will add separately as first option
         
         # Always include the correct destination if it exists and is reachable
-        if next_location and next_location in all_available:
-            options.append(next_location)
-            # Remove from available to avoid duplicates
-            all_available = [loc for loc in all_available if loc.id != next_location.id]
+        if next_location and next_location.id not in excluded_ids:
+            if next_location in all_available:
+                options.append(next_location)
+                excluded_ids.add(next_location.id)
+        
+        # Filter available destinations
+        decoy_pool = [loc for loc in all_available if loc.id not in excluded_ids]
         
         # Add random decoy destinations
-        decoys = random.sample(all_available, min(num_decoys, len(all_available)))
+        decoys = random.sample(decoy_pool, min(num_decoys, len(decoy_pool)))
         options.extend(decoys)
         
-        # Shuffle to randomize order (so correct answer isn't always first)
+        # Shuffle the options (correct + decoys)
         random.shuffle(options)
+        
+        # Always add previous city as FIRST option (if we have one and can travel there)
+        if previous_location and previous_location in all_available:
+            options.insert(0, previous_location)
         
         return options
     
@@ -1838,15 +1855,29 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
     with col_list:
         st.subheader("✈️ Fly To:")
         
+        # Determine if first destination is the previous city (go back option)
+        visited = case.progress.locations_visited if case.progress else []
+        previous_id = visited[-2] if len(visited) >= 2 else None
+        
         # Show destination buttons as a selectable list
-        for loc in destinations:
+        for i, loc in enumerate(destinations):
             travel_time = current_location.get_travel_time_to(loc)
             
+            # Check if this is the "go back" option (previous city)
+            is_go_back = (loc.id == previous_id)
+            
+            if is_go_back:
+                button_label = f"← GO BACK: {loc.city}, {loc.country}\n⏱️ {travel_time} hrs"
+                button_help = f"Return to {loc.city} ({loc.continent})"
+            else:
+                button_label = f"✈️ {loc.city}, {loc.country}\n⏱️ {travel_time} hrs"
+                button_help = f"Fly to {loc.city} ({loc.continent})"
+            
             if st.button(
-                f"✈️ {loc.city}, {loc.country}\n⏱️ {travel_time} hrs",
+                button_label,
                 key=f"travel_{loc.id}",
                 use_container_width=True,
-                help=f"Fly to {loc.city} ({loc.continent})"
+                help=button_help
             ):
                 result = {"action": "travel_to", "destination_id": loc.id}
     
