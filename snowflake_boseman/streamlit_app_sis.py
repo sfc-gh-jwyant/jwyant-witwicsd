@@ -1589,11 +1589,27 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     st.title("🔍 Where in the World is Snowflake Boseman Montana? 🔍")
     st.subheader("A geography mystery adventure")
     
-    # Splash image (720x480) - uses main_splash.png/jpg from stage
-    # Center the image with fixed dimensions
-    col_spacer1, col_img, col_spacer2 = st.columns([1, 3, 1])
+    # Splash image and rules side by side
+    col_img, col_rules = st.columns([2, 1])
+    
     with col_img:
         render_stage_image("main_splash", "Where in the World is Snowflake Boseman Montana?", width=720)
+    
+    with col_rules:
+        st.markdown("### 📋 How to Play")
+        st.markdown("""
+        **The Case:** Snowflake Boseman Montana has stolen something valuable and fled! Track them across the globe before time runs out.
+        
+        **🔍 Investigate** - Question witnesses for clues about the suspect's next destination and appearance.
+        
+        **✈️ Travel** - Fly to cities based on clues. Each flight costs time based on distance.
+        
+        **🚨 Arrest** - When you've found the suspect, issue a warrant! But be sure—wrong arrests end your case.
+        
+        **⏱️ Time** - You have 144 hours (6 days). Investigations take 5 hours each.
+        
+        **🏆 Scoring** - Lower is better! Score = AI credits used. Be efficient with your investigations.
+        """)
     
     st.divider()
     
