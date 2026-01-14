@@ -1124,6 +1124,21 @@ Generate ONLY the witness quote, nothing else."""
         efficiency = max(0, 10 - len(case.progress.locations_visited)) * 50
         return (time_bonus + efficiency) * multiplier.get(case.difficulty, 1)
     
+    def _update_player_stats(self, player: Player) -> bool:
+        """Update player stats in the database."""
+        try:
+            execute_write(f"""
+                UPDATE {TABLE_PREFIX}players 
+                SET cases_solved = {player.cases_solved},
+                    total_score = {player.total_score},
+                    rank = '{player.rank}'
+                WHERE player_id = '{player.id}'
+            """)
+            return True
+        except Exception as e:
+            print(f"Error updating player stats: {e}")
+            return False
+    
     def get_time_remaining(self) -> int:
         return self._time_manager.hours_remaining if self._time_manager else 0
     
