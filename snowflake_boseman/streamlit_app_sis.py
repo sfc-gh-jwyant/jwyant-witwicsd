@@ -2026,31 +2026,38 @@ def render_suspect_mugshot(suspect_id: str, suspect_name: str):
 
 
 def render_arrest(controller: GameController, suspects: List[Suspect]) -> Optional[str]:
-    """Render arrest screen with mugshots."""
+    """Render arrest screen with mugshots in 2-column layout."""
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
-    # Display each suspect: mugshot left, attributes right, arrest button below
-    for suspect in suspects:
-        col_mugshot, col_details = st.columns([1, 2])
+    # Display suspects in 2 columns
+    for i in range(0, len(suspects), 2):
+        col_left, col_right = st.columns(2)
         
-        with col_mugshot:
-            render_suspect_mugshot(suspect.id, suspect.name)
-        
-        with col_details:
-            st.markdown(f"**{suspect.name}**")
-            st.markdown(f"""
-            - **Hair:** {suspect.hair_color}
-            - **Eyes:** {suspect.eye_color}
-            - **Hobby:** {suspect.hobby}
-            - **Vehicle:** {suspect.vehicle}
-            - **Favorite Food:** {suspect.favorite_food}
-            - **Distinguishing Feature:** {suspect.distinguishing_feature}
-            """)
-        
-        # Arrest button spans full width below
-        if st.button(f"🚨 ARREST {suspect.name.upper()}", key=f"arrest_{suspect.id}", use_container_width=True):
-            return suspect.id
+        for j, col in enumerate([col_left, col_right]):
+            if i + j < len(suspects):
+                suspect = suspects[i + j]
+                with col:
+                    # Inner layout: mugshot+name on left, attributes on right
+                    inner_left, inner_right = st.columns([1, 2])
+                    
+                    with inner_left:
+                        render_suspect_mugshot(suspect.id, suspect.name)
+                        st.markdown(f"**{suspect.name}**")
+                    
+                    with inner_right:
+                        st.markdown(f"""
+                        - **Hair:** {suspect.hair_color}
+                        - **Eyes:** {suspect.eye_color}
+                        - **Hobby:** {suspect.hobby}
+                        - **Vehicle:** {suspect.vehicle}
+                        - **Food:** {suspect.favorite_food}
+                        - **Feature:** {suspect.distinguishing_feature}
+                        """)
+                    
+                    # Arrest button below
+                    if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
+                        return suspect.id
         
         st.divider()
     
