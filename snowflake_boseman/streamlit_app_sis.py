@@ -1610,7 +1610,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         
         # Generate dynamic city description with AI
         city_desc = get_dynamic_city_description(controller, location)
-        st.info(city_desc.strip('"\\'))
+        st.markdown(f'<div style="padding: 1rem; margin-bottom: 1rem; background: rgba(41, 181, 232, 0.15); border: 1px solid rgba(41, 181, 232, 0.3); border-radius: 8px;"><p style="margin: 0; font-size: 0.9rem;">{city_desc.strip(chr(34) + chr(92))}</p></div>', unsafe_allow_html=True)
     
     with col_right:
         st.subheader("📔 Clue Notebook")
@@ -1625,8 +1625,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
                     clues_by_city[city] = []
                 clues_by_city[city].append(clue)
             
-            # Display clues in a scrollable container
-            clue_html = '<div style="max-height: 280px; overflow-y: auto; padding-right: 0.5rem;">'
+            # Display clues in a scrollable container (480px to match image height)
+            clue_html = '<div style="min-height: 480px; max-height: 480px; overflow-y: auto; padding: 0.5rem; padding-bottom: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">'
             for city, city_clues in clues_by_city.items():
                 clue_html += f'<p style="margin-bottom: 0.25rem;"><b>{city}:</b></p>'
                 for clue in city_clues:
@@ -1635,7 +1635,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
             clue_html += '</div>'
             st.markdown(clue_html, unsafe_allow_html=True)
         else:
-            st.info("No clues yet. Investigate to gather clues!")
+            # Empty notebook placeholder with same height
+            st.markdown('<div style="min-height: 480px; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;"><p style="color: #29B5E8;">No clues yet. Investigate to gather clues!</p></div>', unsafe_allow_html=True)
     
     st.divider()
     
