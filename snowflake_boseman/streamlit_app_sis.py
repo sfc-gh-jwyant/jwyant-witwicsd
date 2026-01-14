@@ -61,58 +61,14 @@ AVAILABLE_AI_MODELS = [
 ]
 DEFAULT_AI_MODEL = "llama3.1-70b"
 
-
-DIFFICULTY_CONFIG = {
-    1: {
-        "name": "SELECT * FROM clues",
-        "description": "All clues visible, lots of time",
-        "time_budget": 72,
-        "clue_clarity": "obvious",
-        "min_locations": 3,
-        "max_locations": 4,
-        "red_herrings": 0,
-        "decoy_destinations": 2,  # Number of wrong destinations to show
-    },
-    2: {
-        "name": "WITH (NOLOCK)",
-        "description": "Clear hints, moderate challenge",
-        "time_budget": 48,
-        "clue_clarity": "clear",
-        "min_locations": 4,
-        "max_locations": 5,
-        "red_herrings": 1,
-        "decoy_destinations": 3,
-    },
-    3: {
-        "name": "Foreign Key Violation",
-        "description": "Cryptic clues, tighter deadline",
-        "time_budget": 36,
-        "clue_clarity": "cryptic",
-        "min_locations": 5,
-        "max_locations": 7,
-        "red_herrings": 2,
-        "decoy_destinations": 5,
-    },
-    4: {
-        "name": "Deadlock Victim",
-        "description": "Very cryptic, time pressure",
-        "time_budget": 24,
-        "clue_clarity": "very_cryptic",
-        "min_locations": 6,
-        "max_locations": 8,
-        "red_herrings": 3,
-        "decoy_destinations": 7,
-    },
-    5: {
-        "name": "Little Bobby Tables",
-        "description": "Expert mode - riddles only",
-        "time_budget": 12,
-        "clue_clarity": "riddle",
-        "min_locations": 8,
-        "max_locations": 10,
-        "red_herrings": 4,
-        "decoy_destinations": 10,
-    },
+# Difficulty config loaded from database - see get_difficulty_config()
+# Fallback values used if database is unavailable
+DIFFICULTY_CONFIG_FALLBACK = {
+    1: {"name": "SELECT * FROM clues", "description": "All clues visible, lots of time", "time_budget": 72, "clue_clarity": "obvious", "min_locations": 3, "max_locations": 4, "red_herrings": 0, "decoy_destinations": 2},
+    2: {"name": "WITH (NOLOCK)", "description": "Clear hints, moderate challenge", "time_budget": 48, "clue_clarity": "clear", "min_locations": 4, "max_locations": 5, "red_herrings": 1, "decoy_destinations": 3},
+    3: {"name": "Foreign Key Violation", "description": "Cryptic clues, tighter deadline", "time_budget": 36, "clue_clarity": "cryptic", "min_locations": 5, "max_locations": 7, "red_herrings": 2, "decoy_destinations": 5},
+    4: {"name": "Deadlock Victim", "description": "Very cryptic, time pressure", "time_budget": 24, "clue_clarity": "very_cryptic", "min_locations": 6, "max_locations": 8, "red_herrings": 3, "decoy_destinations": 7},
+    5: {"name": "Little Bobby Tables", "description": "Expert mode - riddles only", "time_budget": 12, "clue_clarity": "riddle", "min_locations": 8, "max_locations": 10, "red_herrings": 4, "decoy_destinations": 10},
 }
 
 INVESTIGATION_TIME = 2  # Hours per investigation
@@ -314,7 +270,8 @@ class TimeManager:
     
     def __init__(self, difficulty: int, elapsed_hours: int = 0):
         self.difficulty = difficulty
-        self.total_hours = DIFFICULTY_CONFIG[difficulty]["time_budget"]
+        config = get_difficulty_config()
+        self.total_hours = config[difficulty]["time_budget"]
         self.elapsed_hours = elapsed_hours
     
     @property
@@ -392,6 +349,39 @@ def execute_write(sql: str) -> bool:
     except Exception as e:
         st.error(f"Write error: {e}")
         return False
+
+
+@st.cache_data(ttl=3600)  # Cache for 1 hour
+def get_difficulty_config() -> Dict[int, Dict]:
+    """Load difficulty configuration from the database."""
+    try:
+        rows = execute_query(f"""
+            SELECT difficulty_id, name, description, time_budget_hours, 
+                   clue_clarity, min_locations, max_locations, 
+                   red_herrings, decoy_destinations
+            FROM {TABLE_PREFIX}difficulty_levels
+            ORDER BY difficulty_id
+        """)
+        
+        if not rows:
+            return DIFFICULTY_CONFIG_FALLBACK
+        
+        config = {}
+        for row in rows:
+            config[row["DIFFICULTY_ID"]] = {
+                "name": row["NAME"],
+                "description": row["DESCRIPTION"],
+                "time_budget": row["TIME_BUDGET_HOURS"],
+                "clue_clarity": row["CLUE_CLARITY"],
+                "min_locations": row["MIN_LOCATIONS"],
+                "max_locations": row["MAX_LOCATIONS"],
+                "red_herrings": row["RED_HERRINGS"],
+                "decoy_destinations": row["DECOY_DESTINATIONS"],
+            }
+        return config
+    except Exception as e:
+        print(f"Error loading difficulty config: {e}")
+        return DIFFICULTY_CONFIG_FALLBACK
 
 
 def get_current_user() -> Dict[str, str]:
@@ -523,7 +513,8 @@ class GameController:
         
         # Pick random suspect and generate path
         suspect = random.choice(suspects)
-        config = DIFFICULTY_CONFIG[difficulty]
+        diff_config = get_difficulty_config()
+        config = diff_config[difficulty]
         num_locations = random.randint(config["min_locations"], config["max_locations"])
         
         # Start at Bozeman
@@ -611,7 +602,8 @@ class GameController:
         all_available = self.get_available_destinations()
         
         # Determine number of decoys based on difficulty
-        config = DIFFICULTY_CONFIG.get(case.difficulty, DIFFICULTY_CONFIG[3])
+        diff_config = get_difficulty_config()
+        config = diff_config.get(case.difficulty, diff_config[3])
         num_decoys = config.get("decoy_destinations", 5)
         
         # Build options list
@@ -770,7 +762,8 @@ Generate ONLY the witness quote, nothing else."""
         """Generate clues for investigation using Cortex AI."""
         clues = []
         difficulty = case.difficulty
-        config = DIFFICULTY_CONFIG[difficulty]
+        diff_config = get_difficulty_config()
+        config = diff_config[difficulty]
         city_name = current.city
         
         # Generate destination + suspect clues in one AI call
@@ -1435,10 +1428,11 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     
     with col_diff:
         # Difficulty selector
+        diff_config = get_difficulty_config()
         difficulty = st.selectbox(
             "Select Difficulty",
-            options=[1, 2, 3, 4, 5],
-            format_func=lambda x: f"{DIFFICULTY_CONFIG[x]['name']} - {DIFFICULTY_CONFIG[x]['description']}",
+            options=list(diff_config.keys()),
+            format_func=lambda x: f"{diff_config[x]['name']} - {diff_config[x]['description']}",
         )
     
     with col_model:
@@ -1454,7 +1448,7 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
             st.session_state.ai_model = ai_model
     
     # Show difficulty details
-    config = DIFFICULTY_CONFIG[difficulty]
+    config = diff_config[difficulty]
     st.caption(f"⏱️ Time: {config['time_budget']} hours | 📍 Locations: {config['min_locations']}-{config['max_locations']} | 🔴 Red Herrings: {config['red_herrings']} | 🤖 Model: {ai_model}")
     
     if st.button("🔍 START NEW CASE", use_container_width=True, type="primary"):
@@ -1477,7 +1471,8 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     with col1:
         st.subheader("📋 Current Case")
         st.write(f"**Stolen:** {case.stolen_item}")
-        st.write(f"**Difficulty:** {DIFFICULTY_CONFIG[case.difficulty]['name']}")
+        diff_config = get_difficulty_config()
+        st.write(f"**Difficulty:** {diff_config[case.difficulty]['name']}")
     
     with col2:
         urgency = controller.get_urgency_level()

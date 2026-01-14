@@ -149,6 +149,18 @@ CREATE OR REPLACE TABLE friction_points (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
+CREATE OR REPLACE TABLE difficulty_levels (
+    difficulty_id INT PRIMARY KEY,
+    name VARCHAR NOT NULL,
+    description VARCHAR NOT NULL,
+    time_budget_hours INT NOT NULL,
+    clue_clarity VARCHAR NOT NULL,
+    min_locations INT NOT NULL,
+    max_locations INT NOT NULL,
+    red_herrings INT NOT NULL,
+    decoy_destinations INT NOT NULL
+);
+
 -- ============================================================================
 -- VIEWS
 -- ============================================================================
@@ -158,11 +170,13 @@ SELECT DATE(started_at) as play_date, COUNT(DISTINCT player_id) as dau
 FROM game_sessions GROUP BY 1 ORDER BY 1;
 
 CREATE OR REPLACE VIEW v_win_rate_by_difficulty AS
-SELECT difficulty,
-    CASE difficulty WHEN 1 THEN 'SELECT * FROM clues' WHEN 2 THEN 'WITH (NOLOCK)'
-    WHEN 3 THEN 'Foreign Key Violation' WHEN 4 THEN 'Deadlock Victim' WHEN 5 THEN 'Little Bobby Tables' END as difficulty_name,
+SELECT ca.difficulty,
+    dl.name as difficulty_name,
     COUNT(*) as total_cases, SUM(CASE WHEN outcome = 'won' THEN 1 ELSE 0 END) as wins
-FROM case_analytics GROUP BY difficulty ORDER BY difficulty;
+FROM case_analytics ca
+LEFT JOIN difficulty_levels dl ON ca.difficulty = dl.difficulty_id
+GROUP BY ca.difficulty, dl.name 
+ORDER BY ca.difficulty;
 
 CREATE OR REPLACE VIEW v_leaderboard AS
 SELECT p.snowflake_user, p.rank, p.cases_solved, p.total_score, MAX(hs.score) as best_score
@@ -316,5 +330,16 @@ INSERT INTO landmarks (landmark_id, location_id, name, landmark_type, clue_facts
 ('lm_burjkhalifa', 'loc_dubai', 'Burj Khalifa', 'skyscraper', PARSE_JSON('["World tallest building at 828 meters", "163 floors", "Opened in 2010"]')),
 ('lm_machupicchu', 'loc_cusco', 'Machu Picchu', 'ancient', PARSE_JSON('["15th century Inca citadel", "2,430 meters elevation", "New Seven Wonders of World"]')),
 ('lm_yellowstone', 'loc_bozeman', 'Yellowstone National Park', 'park', PARSE_JSON('["First national park in the world", "Home to Old Faithful geyser", "Sits on a supervolcano"]'));
+
+-- ============================================================================
+-- SEED DATA: DIFFICULTY LEVELS
+-- ============================================================================
+
+INSERT INTO difficulty_levels (difficulty_id, name, description, time_budget_hours, clue_clarity, min_locations, max_locations, red_herrings, decoy_destinations) VALUES
+(1, 'SELECT * FROM clues', 'All clues visible, lots of time', 72, 'obvious', 3, 4, 0, 2),
+(2, 'WITH (NOLOCK)', 'Clear hints, moderate challenge', 48, 'clear', 4, 5, 1, 3),
+(3, 'Foreign Key Violation', 'Cryptic clues, tighter deadline', 36, 'cryptic', 5, 7, 2, 5),
+(4, 'Deadlock Victim', 'Very cryptic, time pressure', 24, 'very_cryptic', 6, 8, 3, 7),
+(5, 'Little Bobby Tables', 'Expert mode - riddles only', 12, 'riddle', 8, 10, 4, 10);
 
 SELECT 'Deployment complete! Database DEMO_WITWISBM.GAME is ready.' as status;
