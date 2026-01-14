@@ -60,6 +60,7 @@ CREATE OR REPLACE HYBRID TABLE players (
     total_score INT DEFAULT 0,
     ai_prompt_count INT DEFAULT 0,  -- Tracks total AI prompts used by this player
     ai_token_count INT DEFAULT 0,   -- Tracks total AI tokens used by this player
+    ai_credits_used FLOAT DEFAULT 0.0,  -- Tracks total Snowflake credits used for AI
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
@@ -149,6 +150,7 @@ CREATE OR REPLACE HYBRID TABLE case_analytics (
     time_used_hours INT,
     ai_prompts INT DEFAULT 0,  -- Number of AI prompts used in this case
     ai_tokens INT DEFAULT 0,   -- Total tokens used in this case
+    ai_credits FLOAT DEFAULT 0.0,  -- Credits used in this case
     ai_model VARCHAR,          -- Model used for this case
     started_at TIMESTAMP,
     ended_at TIMESTAMP,

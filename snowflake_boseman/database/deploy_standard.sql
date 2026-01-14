@@ -63,6 +63,7 @@ CREATE OR REPLACE TABLE players (
     total_score INT DEFAULT 0,
     ai_prompt_count INT DEFAULT 0,
     ai_token_count INT DEFAULT 0,
+    ai_credits_used FLOAT DEFAULT 0.0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
@@ -136,6 +137,7 @@ CREATE OR REPLACE TABLE case_analytics (
     time_used_hours INT,
     ai_prompts INT DEFAULT 0,
     ai_tokens INT DEFAULT 0,
+    ai_credits FLOAT DEFAULT 0.0,
     ai_model VARCHAR,
     started_at TIMESTAMP,
     ended_at TIMESTAMP

@@ -209,6 +209,7 @@ class Player:
     total_score: int = 0
     ai_prompt_count: int = 0
     ai_token_count: int = 0  # Total tokens used across all prompts
+    ai_credits_used: float = 0.0  # Total Snowflake credits used for AI
     
     @property
     def display_name(self) -> str:
@@ -236,6 +237,7 @@ class Player:
             total_score=data.get("TOTAL_SCORE", data.get("total_score", 0)),
             ai_prompt_count=data.get("AI_PROMPT_COUNT", data.get("ai_prompt_count", 0)),
             ai_token_count=data.get("AI_TOKEN_COUNT", data.get("ai_token_count", 0)),
+            ai_credits_used=float(data.get("AI_CREDITS_USED", data.get("ai_credits_used", 0.0))),
         )
     
     def update_rank(self) -> None:
@@ -272,6 +274,7 @@ class CaseProgress:
     wrong_travels: int = 0
     ai_prompts: int = 0  # Number of AI prompts used in this case
     ai_tokens: int = 0   # Total tokens used in this case
+    ai_credits: float = 0.0  # Credits used in this case
     ai_model: str = ""   # Model used for this case
 
 
@@ -1020,35 +1023,49 @@ Generate ONLY the witness quote, nothing else."""
                 if response:
                     response = response.strip().strip('"').strip("'")
             
-            # Step 2: Count both input and output tokens in a single query
+            # Step 2: Count tokens and calculate credits in a single SQL query
+            # Join with cortex_credit_rates to get cost per million tokens
             input_tokens = 0
             output_tokens = 0
+            credits_used = 0.0
             if response:
                 safe_response = response.replace("'", "''")
                 try:
                     token_result = session.sql(f"""
                         SELECT 
                             SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_prompt}') as prompt_tokens,
-                            SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_response}') as response_tokens
+                            SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_response}') as response_tokens,
+                            COALESCE(cr.credits_per_million_input_tokens, 0.36) as input_rate,
+                            COALESCE(cr.credits_per_million_output_tokens, 0.36) as output_rate
+                        FROM (SELECT 1) dummy
+                        LEFT JOIN {TABLE_PREFIX}cortex_credit_rates cr ON cr.model_name = '{model}'
                     """).collect()
                     if token_result and len(token_result) > 0:
                         input_tokens = token_result[0]['PROMPT_TOKENS'] or 0
                         output_tokens = token_result[0]['RESPONSE_TOKENS'] or 0
+                        input_rate = float(token_result[0]['INPUT_RATE'] or 0.36)
+                        output_rate = float(token_result[0]['OUTPUT_RATE'] or 0.36)
+                        # Calculate credits: (tokens / 1,000,000) * rate
+                        credits_used = (input_tokens / 1_000_000 * input_rate) + (output_tokens / 1_000_000 * output_rate)
                 except Exception:
                     # Fallback to rough estimates
                     input_tokens = len(prompt) // 4
                     output_tokens = len(response) // 4
+                    # Use default llama3.1-70b rate (0.36) as fallback
+                    credits_used = (input_tokens + output_tokens) / 1_000_000 * 0.36
             
             total_tokens = input_tokens + output_tokens
             
-            # Update player's total token and prompt counts
+            # Update player's total token, prompt, and credit counts
             if self._current_player:
                 self._current_player.ai_prompt_count += 1
                 self._current_player.ai_token_count += total_tokens
+                self._current_player.ai_credits_used += credits_used
                 execute_write(f"""
                     UPDATE {TABLE_PREFIX}players 
                     SET ai_prompt_count = ai_prompt_count + 1,
-                        ai_token_count = ai_token_count + {total_tokens}
+                        ai_token_count = ai_token_count + {total_tokens},
+                        ai_credits_used = ai_credits_used + {credits_used}
                     WHERE player_id = '{self._current_player.id}'
                 """)
             
@@ -1056,6 +1073,7 @@ Generate ONLY the witness quote, nothing else."""
             if self._current_case and self._current_case.progress:
                 self._current_case.progress.ai_prompts += 1
                 self._current_case.progress.ai_tokens += total_tokens
+                self._current_case.progress.ai_credits += credits_used
                 self._current_case.progress.ai_model = model
             
             return response
@@ -1443,6 +1461,19 @@ def render_investigation(controller: GameController, case: Case, location: Locat
         tokens = player.ai_token_count
         token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
         st.metric("🔢 AI Tokens", token_display)
+    
+    # Add a second row for credits
+    col_credits, col_spacer1, col_spacer2, col_spacer3, col_spacer4 = st.columns(5)
+    with col_credits:
+        # Format credits with appropriate precision
+        credits = player.ai_credits_used
+        if credits >= 1.0:
+            credits_display = f"{credits:.2f}"
+        elif credits >= 0.001:
+            credits_display = f"{credits:.4f}"
+        else:
+            credits_display = f"{credits:.6f}"
+        st.metric("💰 AI Credits", credits_display)
     
     st.divider()
     
