@@ -1459,7 +1459,7 @@ def apply_theme():
     """, unsafe_allow_html=True)
 
 
-def render_stage_image(location_id: str, alt_text: str, use_container_width: bool = True):
+def render_stage_image(location_id: str, alt_text: str, use_container_width: bool = True, width: int = None):
     """
     Render an image from the Snowflake stage.
     Images are stored as loc_[city].jpg or loc_[city].png in the media/ folder.
@@ -1479,12 +1479,18 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
             try:
                 result = session.file.get(image_path, "/tmp/")
                 local_path = f"/tmp/{location_id}.{ext}"
-                st.image(local_path, caption=alt_text, use_container_width=use_container_width)
+                if width:
+                    st.image(local_path, caption=alt_text, width=width)
+                else:
+                    st.image(local_path, caption=alt_text, use_container_width=use_container_width)
                 return True
             except Exception:
                 # Alternative: Try using the stage URL directly
                 try:
-                    st.image(image_path, caption=alt_text, use_container_width=use_container_width)
+                    if width:
+                        st.image(image_path, caption=alt_text, width=width)
+                    else:
+                        st.image(image_path, caption=alt_text, use_container_width=use_container_width)
                     return True
                 except:
                     pass
@@ -1492,7 +1498,7 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
             continue
     
     # Fallback to placeholder
-    render_art_placeholder("Location", alt_text)
+    render_art_placeholder("Location", alt_text, width or 300, (width * 2 // 3) if width else 200)
     return False
 
 
@@ -1584,7 +1590,10 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     st.subheader("A geography mystery adventure")
     
     # Splash image (720x480) - uses main_splash.png/jpg from stage
-    render_stage_image("main_splash", "Where in the World is Snowflake Boseman Montana?")
+    # Center the image with fixed dimensions
+    col_spacer1, col_img, col_spacer2 = st.columns([1, 3, 1])
+    with col_img:
+        render_stage_image("main_splash", "Where in the World is Snowflake Boseman Montana?", width=720)
     
     st.divider()
     
