@@ -208,6 +208,7 @@ class Player:
     cases_solved: int = 0
     total_score: int = 0
     ai_prompt_count: int = 0
+    ai_token_count: int = 0  # Total tokens used across all prompts
     
     @property
     def display_name(self) -> str:
@@ -234,6 +235,7 @@ class Player:
             cases_solved=data.get("CASES_SOLVED", data.get("cases_solved", 0)),
             total_score=data.get("TOTAL_SCORE", data.get("total_score", 0)),
             ai_prompt_count=data.get("AI_PROMPT_COUNT", data.get("ai_prompt_count", 0)),
+            ai_token_count=data.get("AI_TOKEN_COUNT", data.get("ai_token_count", 0)),
         )
     
     def update_rank(self) -> None:
@@ -268,6 +270,9 @@ class CaseProgress:
     locations_visited: List[str] = field(default_factory=list)
     correct_travels: int = 0
     wrong_travels: int = 0
+    ai_prompts: int = 0  # Number of AI prompts used in this case
+    ai_tokens: int = 0   # Total tokens used in this case
+    ai_model: str = ""   # Model used for this case
 
 
 @dataclass
@@ -983,7 +988,7 @@ Generate ONLY the witness quote, nothing else."""
         )
     
     def _call_ai_complete(self, prompt: str) -> Optional[str]:
-        """Call Snowflake Cortex AI_COMPLETE function."""
+        """Call Snowflake Cortex AI_COMPLETE function with token counting."""
         try:
             session = get_snowflake_session()
             # Escape single quotes in prompt
@@ -991,6 +996,25 @@ Generate ONLY the witness quote, nothing else."""
             
             # Get selected model from session state
             model = st.session_state.get("ai_model", DEFAULT_AI_MODEL)
+            
+            # Count input tokens using SNOWFLAKE.CORTEX.COUNT_TOKENS
+            # Use a compatible model name for token counting (some models may not be supported)
+            token_count_model = model if model in [
+                "llama3-70b", "llama3-8b", "llama3.1-405b", "llama3.1-70b", "llama3.1-8b",
+                "llama3.3-70b", "llama4-maverick", "llama4-scout", "mistral-7b", 
+                "mistral-large", "mistral-large2", "mixtral-8x7b", "deepseek-r1",
+                "snowflake-arctic", "snowflake-llama-3.1-405b", "snowflake-llama-3.3-70b"
+            ] else "llama3.1-70b"  # Default to a supported model for counting
+            
+            input_tokens = 0
+            try:
+                token_result = session.sql(f"""
+                    SELECT SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_prompt}') as tokens
+                """).collect()
+                if token_result and len(token_result) > 0:
+                    input_tokens = token_result[0]['TOKENS'] or 0
+            except Exception:
+                pass  # Token counting failed, continue without it
             
             result = session.sql(f"""
                 SELECT AI_COMPLETE(
@@ -1000,22 +1024,35 @@ Generate ONLY the witness quote, nothing else."""
                 ) as response
             """).collect()
             
-            # Increment and persist AI prompt counter for player
+            # Estimate output tokens (rough estimate: response length / 4)
+            output_tokens = 0
+            response = None
+            if result and len(result) > 0:
+                response = result[0]['RESPONSE']
+                if response:
+                    response = response.strip().strip('"').strip("'")
+                    output_tokens = len(response) // 4  # Rough estimate
+            
+            total_tokens = input_tokens + output_tokens
+            
+            # Update player's total token and prompt counts
             if self._current_player:
                 self._current_player.ai_prompt_count += 1
+                self._current_player.ai_token_count += total_tokens
                 execute_write(f"""
                     UPDATE {TABLE_PREFIX}players 
-                    SET ai_prompt_count = ai_prompt_count + 1 
+                    SET ai_prompt_count = ai_prompt_count + 1,
+                        ai_token_count = ai_token_count + {total_tokens}
                     WHERE player_id = '{self._current_player.id}'
                 """)
             
-            if result and len(result) > 0:
-                response = result[0]['RESPONSE']
-                # Clean up response - remove quotes if present
-                if response:
-                    response = response.strip().strip('"').strip("'")
-                return response
-            return None
+            # Update case-level tracking
+            if self._current_case and self._current_case.progress:
+                self._current_case.progress.ai_prompts += 1
+                self._current_case.progress.ai_tokens += total_tokens
+                self._current_case.progress.ai_model = model
+            
+            return response
         except Exception as e:
             # Log error but don't crash - return None to use fallback
             print(f"AI_COMPLETE error: {e}")
@@ -1373,7 +1410,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     st.caption(f"{location.continent}")
     
     # Header with case info
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
         st.subheader("📋 Current Case")
@@ -1394,6 +1431,12 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     
     with col4:
         st.metric("🤖 AI Prompts", player.ai_prompt_count)
+    
+    with col5:
+        # Format token count with K suffix for thousands
+        tokens = player.ai_token_count
+        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
+        st.metric("🔢 AI Tokens", token_display)
     
     st.divider()
     

@@ -59,6 +59,7 @@ CREATE OR REPLACE HYBRID TABLE players (
     cases_solved INT DEFAULT 0,
     total_score INT DEFAULT 0,
     ai_prompt_count INT DEFAULT 0,  -- Tracks total AI prompts used by this player
+    ai_token_count INT DEFAULT 0,   -- Tracks total AI tokens used by this player
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP()
 );
 
@@ -146,6 +147,9 @@ CREATE OR REPLACE HYBRID TABLE case_analytics (
     clues_gathered INT,
     time_budget_hours INT,
     time_used_hours INT,
+    ai_prompts INT DEFAULT 0,  -- Number of AI prompts used in this case
+    ai_tokens INT DEFAULT 0,   -- Total tokens used in this case
+    ai_model VARCHAR,          -- Model used for this case
     started_at TIMESTAMP,
     ended_at TIMESTAMP,
     FOREIGN KEY (player_id) REFERENCES players(player_id),
