@@ -1334,12 +1334,8 @@ def get_dynamic_city_description(controller: "GameController", location: Locatio
     if cache_key in st.session_state:
         return st.session_state[cache_key]
     
-    # Generate a new description using AI
-    try:
-        session = get_snowflake_session()
-        model = st.session_state.get("ai_model", DEFAULT_AI_MODEL)
-        
-        prompt = f"""You are a colorful, enthusiastic travel guide for a family-friendly geography game.
+    # Generate a new description using AI via controller's _call_ai_complete
+    prompt = f"""You are a colorful, enthusiastic travel guide for a family-friendly geography game.
 Write a 2-3 sentence welcome message for a detective arriving in {location.city}, {location.country}.
 
 RULES:
@@ -1351,31 +1347,13 @@ RULES:
 - Write as if you're a friendly local greeting a visitor
 
 Generate ONLY the welcome message, nothing else."""
-        
-        safe_prompt = prompt.replace("'", "''")
-        
-        result = session.sql(f"""
-            SELECT AI_COMPLETE(
-                model => '{model}',
-                prompt => '{safe_prompt}',
-                model_parameters => {{'guardrails': TRUE, 'max_tokens': 100, 'temperature': 0.8}}
-            ) as response
-        """).collect()
-        
-        if result and len(result) > 0:
-            description = result[0]['RESPONSE']
-            if description:
-                description = description.strip().strip('"').strip("'")
-                # Cache the description
-                st.session_state[cache_key] = description
-                
-                # Track the AI call (simplified - don't use full _call_ai_complete to avoid complexity)
-                if controller._current_player:
-                    controller._current_player.ai_prompt_count += 1
-                
-                return description
-    except Exception as e:
-        print(f"City description AI error: {e}")
+    
+    description = controller._call_ai_complete(prompt)
+    
+    if description:
+        # Cache the description
+        st.session_state[cache_key] = description
+        return description
     
     # Fallback to static description or default
     if location.description:
