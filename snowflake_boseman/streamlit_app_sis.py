@@ -1038,11 +1038,13 @@ Generate ONLY the witness quote, nothing else."""
             self._current_player.cases_solved += 1
             self._current_player.total_score += score
             self._current_player.update_rank()
+            self._update_player_stats(self._current_player)
             
             return {
                 "won": True,
                 "message": f"You caught {case.suspect.name}! Case solved!",
                 "score": score,
+                "game_over": True,  # Case is complete, return to menu
             }
         elif not is_at_location:
             # Wrong location - game over
@@ -1260,135 +1262,6 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     return False
 
 
-def get_stage_image_base64(location_id: str) -> Optional[str]:
-    """
-    Get a location image from the stage as a base64 data URL.
-    Uses MEDIA_STAGE/{location_id}.jpg or .png
-    
-    Returns None if image not found.
-    """
-    import base64
-    
-    extensions = [("jpg", "image/jpeg"), ("png", "image/png")]
-    session = get_snowflake_session()
-    
-    for ext, mime_type in extensions:
-        try:
-            image_path = f"{MEDIA_STAGE}/{location_id}.{ext}"
-            local_path = f"/tmp/{location_id}.{ext}"
-            
-            # Try to download from stage
-            session.file.get(image_path, "/tmp/")
-            
-            # Read and encode as base64
-            with open(local_path, "rb") as f:
-                image_bytes = f.read()
-                b64_string = base64.b64encode(image_bytes).decode("utf-8")
-                return f"data:{mime_type};base64,{b64_string}"
-        except Exception:
-            continue
-    
-    return None
-
-
-def apply_background_image(location_id: str):
-    """
-    Apply a city background image using CSS.
-    Loads image from MEDIA_STAGE/{location_id}.jpg or .png
-    Background is 100% opaque, UI elements float on top with semi-transparent backgrounds.
-    
-    Args:
-        location_id: The location ID (e.g., "loc_paris")
-    """
-    image_url = get_stage_image_base64(location_id)
-    
-    if not image_url:
-        return
-    
-    st.markdown(f"""
-    <style>
-    /* City background image - 100% opaque, covers entire viewport */
-    .stApp {{
-        background-image: url('{image_url}') !important;
-        background-size: cover !important;
-        background-position: center !important;
-        background-repeat: no-repeat !important;
-        background-attachment: fixed !important;
-    }}
-    
-    /* Main content area - semi-transparent to show background */
-    .stApp > header {{
-        background: rgba(13, 27, 42, 0.85) !important;
-        backdrop-filter: blur(10px);
-    }}
-    
-    /* All main containers - semi-transparent dark overlay */
-    [data-testid="stAppViewContainer"] {{
-        background: transparent !important;
-    }}
-    
-    [data-testid="stMain"] {{
-        background: transparent !important;
-    }}
-    
-    /* Content blocks get semi-transparent background */
-    [data-testid="stVerticalBlock"] {{
-        background: rgba(13, 27, 42, 0.75);
-        backdrop-filter: blur(8px);
-        border-radius: 12px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-    }}
-    
-    /* Columns container */
-    [data-testid="column"] {{
-        background: rgba(13, 27, 42, 0.6);
-        backdrop-filter: blur(5px);
-        border-radius: 8px;
-        padding: 0.75rem;
-        border: 1px solid rgba(41, 181, 232, 0.2);
-    }}
-    
-    /* Info/warning/success boxes */
-    [data-testid="stAlert"] {{
-        background: rgba(13, 27, 42, 0.8) !important;
-        backdrop-filter: blur(8px);
-    }}
-    
-    /* Metrics */
-    [data-testid="stMetric"] {{
-        background: rgba(13, 27, 42, 0.7);
-        backdrop-filter: blur(5px);
-        border-radius: 8px;
-        padding: 0.5rem;
-    }}
-    
-    /* Buttons remain fully opaque and visible */
-    .stButton > button {{
-        background: linear-gradient(135deg, #29B5E8 0%, #1E88E5 100%) !important;
-        opacity: 1 !important;
-        position: relative;
-        z-index: 10;
-    }}
-    
-    /* Selectboxes and inputs */
-    [data-testid="stSelectbox"], 
-    [data-testid="stTextInput"] {{
-        background: rgba(13, 27, 42, 0.8);
-        backdrop-filter: blur(5px);
-        border-radius: 8px;
-    }}
-    
-    /* Sidebar if present */
-    [data-testid="stSidebar"] {{
-        background: rgba(13, 27, 42, 0.9) !important;
-        backdrop-filter: blur(10px);
-    }}
-    </style>
-    """, unsafe_allow_html=True)
-    """, unsafe_allow_html=True)
-
-
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
     """Render a placeholder for missing art with Snowflake styling."""
     st.markdown(f"""
@@ -1494,9 +1367,6 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
 def render_investigation(controller: GameController, case: Case, location: Location, player: Player) -> Dict:
     """Render investigation screen."""
     result = {"action": None}
-    
-    # Apply city image as CSS background from stage (100% opaque, UI floats on top)
-    apply_background_image(location.id)
     
     # Title
     st.title(f"📍 {location.city}, {location.country}")
@@ -1903,6 +1773,27 @@ def main():
                 st.rerun()
                 return
             
+            # Check if case is still active (not won/lost)
+            if not case.is_active:
+                st.warning("This case is already closed. Starting fresh...")
+                st.session_state.game_state = GameState.MAIN_MENU
+                st.session_state.current_case = None
+                st.session_state.time_manager = None
+                st.rerun()
+                return
+            
+            # Check if time has run out
+            if controller.get_time_remaining() <= 0:
+                case.status = CaseStatus.LOST_TIME
+                st.session_state.case_result = {
+                    "won": False,
+                    "message": "Time ran out! The suspect escaped!",
+                    "score": 0,
+                }
+                st.session_state.game_state = GameState.CASE_RESULT
+                st.rerun()
+                return
+            
             result = render_investigation(controller, case, location, player)
         except Exception as e:
             st.error(f"Error in investigation: {e}")
@@ -1943,8 +1834,10 @@ def main():
         case = controller.get_current_case()
         location = controller.get_current_location()
         
-        if not case or not location:
+        if not case or not location or not case.is_active:
             st.session_state.game_state = GameState.MAIN_MENU
+            st.session_state.current_case = None
+            st.session_state.time_manager = None
             st.rerun()
             return
         
@@ -1975,8 +1868,10 @@ def main():
     elif state_value == GameState.ARREST.value:
         case = controller.get_current_case()
         
-        if not case:
+        if not case or not case.is_active:
             st.session_state.game_state = GameState.MAIN_MENU
+            st.session_state.current_case = None
+            st.session_state.time_manager = None
             st.rerun()
             return
         
@@ -2029,7 +1924,10 @@ def main():
         )
         
         if result["action"] in ("main_menu", "new_case"):
+            # Clear all case-related state when leaving a finished case
             st.session_state.case_result = None
+            st.session_state.current_case = None
+            st.session_state.time_manager = None
             st.session_state.controller = GameController()  # Reset controller
             st.session_state.game_state = GameState.MAIN_MENU
             st.rerun()
