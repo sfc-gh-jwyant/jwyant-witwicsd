@@ -1323,6 +1323,66 @@ def render_stage_image(location_id: str, alt_text: str, use_container_width: boo
     return False
 
 
+def get_dynamic_city_description(controller: "GameController", location: Location) -> str:
+    """
+    Generate a dynamic, colorful city description using AI_COMPLETE.
+    Caches the description in session state to avoid regenerating on every rerun.
+    """
+    cache_key = f"city_desc_{location.id}"
+    
+    # Check if we already have a cached description for this location
+    if cache_key in st.session_state:
+        return st.session_state[cache_key]
+    
+    # Generate a new description using AI
+    try:
+        session = get_snowflake_session()
+        model = st.session_state.get("ai_model", DEFAULT_AI_MODEL)
+        
+        prompt = f"""You are a colorful, enthusiastic travel guide for a family-friendly geography game.
+Write a 2-3 sentence welcome message for a detective arriving in {location.city}, {location.country}.
+
+RULES:
+- Be warm, friendly, and exciting - make the player feel like they're on an adventure!
+- Mention 1-2 unique things about this city (landmarks, culture, food, climate, or fun facts)
+- Keep it safe for work and appropriate for all ages
+- Use vivid, descriptive language that paints a picture
+- Do NOT mention any crimes, suspects, or detective work
+- Write as if you're a friendly local greeting a visitor
+
+Generate ONLY the welcome message, nothing else."""
+        
+        safe_prompt = prompt.replace("'", "''")
+        
+        result = session.sql(f"""
+            SELECT AI_COMPLETE(
+                model => '{model}',
+                prompt => '{safe_prompt}',
+                model_parameters => {{'guardrails': TRUE, 'max_tokens': 100, 'temperature': 0.8}}
+            ) as response
+        """).collect()
+        
+        if result and len(result) > 0:
+            description = result[0]['RESPONSE']
+            if description:
+                description = description.strip().strip('"').strip("'")
+                # Cache the description
+                st.session_state[cache_key] = description
+                
+                # Track the AI call (simplified - don't use full _call_ai_complete to avoid complexity)
+                if controller._current_player:
+                    controller._current_player.ai_prompt_count += 1
+                
+                return description
+    except Exception as e:
+        print(f"City description AI error: {e}")
+    
+    # Fallback to static description or default
+    if location.description:
+        return location.description
+    return f"Welcome to {location.city}, {location.country}! This fascinating city awaits your investigation."
+
+
 def render_art_placeholder(art_type: str, alt_text: str, width: int = 200, height: int = 150):
     """Render a placeholder for missing art with Snowflake styling."""
     st.markdown(f"""
@@ -1455,8 +1515,14 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     
     with col4:
         st.metric("🤖 AI Prompts", player.ai_prompt_count)
-    
+
     with col5:
+        # Format token count with K suffix for thousands
+        tokens = player.ai_token_count
+        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
+        st.metric("🔢 AI Tokens", token_display)
+
+    with col6:
         # Format credits with appropriate precision
         credits = player.ai_credits_used
         if credits >= 1.0:
@@ -1467,11 +1533,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
             credits_display = f"{credits:.6f}"
         st.metric("💰 AI Credits", credits_display)
     
-    with col6:
-        # Format token count with K suffix for thousands
-        tokens = player.ai_token_count
-        token_display = f"{tokens // 1000}K" if tokens >= 1000 else str(tokens)
-        st.metric("🔢 AI Tokens", token_display)
+
 
     st.divider()
     
@@ -1492,10 +1554,9 @@ def render_investigation(controller: GameController, case: Case, location: Locat
             # Try to load from stage using location_id
             render_stage_image(location.id, f"{location.city}, {location.country}")
         
-        if location.description:
-            st.info(location.description)
-        else:
-            st.info(f"You've arrived in {location.city}, {location.country}. Look around for clues!")
+        # Generate dynamic city description with AI
+        city_desc = get_dynamic_city_description(controller, location)
+        st.info(city_desc)
     
     with col_right:
         st.subheader("📔 Clue Notebook")
