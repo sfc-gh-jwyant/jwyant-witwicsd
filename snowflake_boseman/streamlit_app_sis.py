@@ -2075,13 +2075,11 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
                         # Image on top
                         render_suspect_mugshot(suspect.id, suspect.name)
                         
-                        # Rap sheet style details
+                        # Suspect details with typewriter font
                         st.markdown(f"""
-                        <div style="background: #f5f5dc; color: #1a1a1a; padding: 15px; 
-                                    border-radius: 4px; font-family: 'Courier New', Courier, monospace;
-                                    margin: 10px 0; border: 1px solid #8b8b7a;">
-                            <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px; 
-                                        border-bottom: 2px solid #1a1a1a; padding-bottom: 5px;">
+                        <div style="padding: 10px 0; font-family: 'Courier New', Courier, monospace;">
+                            <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px; 
+                                        border-bottom: 1px solid #29B5E8; padding-bottom: 5px; color: #29B5E8;">
                                 {suspect.name.upper()}
                             </div>
                             <div style="font-size: 13px; line-height: 1.6;">
@@ -2090,8 +2088,7 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
                                 <b>HOBBY:</b> {suspect.hobby}<br>
                                 <b>VEHICLE:</b> {suspect.vehicle}<br>
                                 <b>FOOD:</b> {suspect.favorite_food}<br>
-                                <b>DISTINGUISHING FEATURE:</b><br>
-                                {suspect.distinguishing_feature}
+                                <b>FEATURE:</b> {suspect.distinguishing_feature}
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
