@@ -1,6 +1,7 @@
 import requests
 import os
 import re
+import unicodedata
 
 # --- CONFIGURATION ---
 INPUT_FILE = "cities.txt"
@@ -70,7 +71,10 @@ def main():
     
     for city in cities:
         print(f"📍 {city}")
-        safe_city = re.sub(r'\W+', '_', city.lower())
+        # Normalize unicode to remove accents (é→e, ü→u, etc.)
+        normalized = unicodedata.normalize('NFKD', city.lower())
+        # Keep only ASCII letters (a-z), remove everything else
+        safe_city = re.sub(r'[^a-z]', '', normalized.encode('ascii', 'ignore').decode('ascii'))
         download_city_image(city, f"downloads/loc_{safe_city}")
 
 
