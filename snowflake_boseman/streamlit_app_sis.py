@@ -230,7 +230,8 @@ class CaseProgress:
     wrong_travels: int = 0
     ai_prompts: int = 0  # Number of AI prompts used in this case
     ai_tokens: int = 0   # Total tokens used in this case
-    ai_credits: float = 0.0  # Credits used in this case
+    ai_credits: float = 0.0  # Credits used in this case (tokens/1M * rate)
+    ai_score: int = 0    # Score: (input_tokens * input_rate) + (output_tokens * output_rate)
     ai_model: str = ""   # Model used for this case
 
 
@@ -1040,11 +1041,12 @@ Generate ONLY the witness quote, nothing else."""
                 if response:
                     response = response.strip().strip('"').strip("'")
             
-            # Step 2: Count tokens and calculate credits in a single SQL query
+            # Step 2: Count tokens and calculate credits/score in a single SQL query
             # Join with cortex_credit_rates to get cost per million tokens
             input_tokens = 0
             output_tokens = 0
             credits_used = 0.0
+            score_delta = 0  # Score = input_tokens * input_rate + output_tokens * output_rate
             if response:
                 safe_response = response.replace("'", "''")
                 try:
@@ -1064,12 +1066,15 @@ Generate ONLY the witness quote, nothing else."""
                         output_rate = float(token_result[0]['OUTPUT_RATE'] or 0.36)
                         # Calculate credits: (tokens / 1,000,000) * rate
                         credits_used = (input_tokens / 1_000_000 * input_rate) + (output_tokens / 1_000_000 * output_rate)
+                        # Calculate score: input_tokens * input_rate + output_tokens * output_rate
+                        score_delta = round((input_tokens * input_rate) + (output_tokens * output_rate))
                 except Exception:
                     # Fallback to rough estimates
                     input_tokens = len(prompt) // 4
                     output_tokens = len(response) // 4
                     # Use default llama3.1-70b rate (0.36) as fallback
                     credits_used = (input_tokens + output_tokens) / 1_000_000 * 0.36
+                    score_delta = round((input_tokens + output_tokens) * 0.36)
             
             total_tokens = input_tokens + output_tokens
             
@@ -1091,6 +1096,7 @@ Generate ONLY the witness quote, nothing else."""
                 self._current_case.progress.ai_prompts += 1
                 self._current_case.progress.ai_tokens += total_tokens
                 self._current_case.progress.ai_credits += credits_used
+                self._current_case.progress.ai_score += score_delta
                 self._current_case.progress.ai_model = model
             
             return response
@@ -1150,19 +1156,15 @@ Generate ONLY the witness quote, nothing else."""
             }
     
     def _calculate_score(self, case: Case) -> int:
-        """Calculate score for completed case.
+        """Get score for completed case.
         
         Score formula: (input_tokens * input_rate) + (output_tokens * output_rate)
         Lower is better (like golf) - fewer tokens and cheaper models = better score.
         
-        The ai_credits field accumulates: sum of (tokens / 1M * rate) per prompt.
-        Multiply by 1M to get the raw token*rate value as the score.
+        Score is calculated incrementally in _call_ai_complete and stored in ai_score.
         """
         if case.progress:
-            # Score = input_tokens * input_rate + output_tokens * output_rate
-            # ai_credits = sum of (input_tokens/1M * input_rate + output_tokens/1M * output_rate)
-            # So score = ai_credits * 1M
-            return round(case.progress.ai_credits * 1_000_000)
+            return case.progress.ai_score
         return 0
     
     def _update_player_stats(self, player: Player) -> bool:
@@ -1774,18 +1776,16 @@ def render_investigation(controller: GameController, case: Case, location: Locat
     case_prompts = case.progress.ai_prompts if case.progress else 0
     case_tokens = case.progress.ai_tokens if case.progress else 0
     case_tok_str = f"{case_tokens // 1000}K" if case_tokens >= 1000 else str(case_tokens)
-    case_credits = case.progress.ai_credits if case.progress else 0.0
-    case_cred_str = f"{case_credits:.4f}" if case_credits < 1 else f"{case_credits:.2f}"
+    case_score = case.progress.ai_score if case.progress else 0
+    case_score_str = f"{case_score:,}"
     
     player_tok = player.ai_token_count
     player_tok_str = f"{player_tok // 1000}K" if player_tok >= 1000 else str(player_tok)
-    player_cred = player.ai_credits_used
-    player_cred_str = f"{player_cred:.4f}" if player_cred < 1 else f"{player_cred:.2f}"
     
     st.markdown(f"""
     <div style="display: flex; justify-content: space-between; font-size: 0.8rem; padding: 0.5rem; background: rgba(41, 181, 232, 0.1); border-radius: 8px;">
-        <div><b>📊 This Case:</b> 📍 {case_locs} locations | 🤖 {case_prompts} prompts | 🔢 {case_tok_str} tokens | 💰 {case_cred_str} credits</div>
-        <div><b>🎮 Lifetime:</b> 🏆 {player.cases_solved} solved | ⭐ {player.total_score} pts | 🤖 {player.ai_prompt_count} prompts | 🔢 {player_tok_str} tokens | 💰 {player_cred_str} credits</div>
+        <div><b>📊 This Case:</b> 📍 {case_locs} locations | 🤖 {case_prompts} prompts | 🔢 {case_tok_str} tokens | 🏌️ {case_score_str} score</div>
+        <div><b>🎮 Lifetime:</b> 🏆 {player.cases_solved} solved | 🏌️ {player.total_score:,} best | 🤖 {player.ai_prompt_count} prompts | 🔢 {player_tok_str} tokens</div>
     </div>
     """, unsafe_allow_html=True)
     
