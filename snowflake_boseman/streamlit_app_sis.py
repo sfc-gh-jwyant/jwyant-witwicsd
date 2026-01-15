@@ -2054,7 +2054,7 @@ def render_suspect_mugshot(suspect_id: str, suspect_name: str):
 
 
 def render_arrest(controller: GameController, suspects: List[Suspect]) -> Optional[str]:
-    """Render arrest screen with responsive mugshots layout."""
+    """Render arrest screen with responsive mugshots layout styled as rap sheets."""
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
@@ -2071,15 +2071,26 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
                         # Image on top
                         render_suspect_mugshot(suspect.id, suspect.name)
                         
-                        # Name below image
-                        st.markdown(f"**{suspect.name}**")
-                        
-                        # Details below name
-                        st.markdown(f"🎨 Hair: {suspect.hair_color} · 👁️ Eyes: {suspect.eye_color}")
-                        st.markdown(f"🎯 Hobby: {suspect.hobby}")
-                        st.markdown(f"🚗 Vehicle: {suspect.vehicle}")
-                        st.markdown(f"🍽️ Food: {suspect.favorite_food}")
-                        st.markdown(f"✨ Feature: {suspect.distinguishing_feature}")
+                        # Rap sheet style details
+                        st.markdown(f"""
+                        <div style="background: #f5f5dc; color: #1a1a1a; padding: 15px; 
+                                    border-radius: 4px; font-family: 'Courier New', Courier, monospace;
+                                    margin: 10px 0; border: 1px solid #8b8b7a;">
+                            <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px; 
+                                        border-bottom: 2px solid #1a1a1a; padding-bottom: 5px;">
+                                {suspect.name.upper()}
+                            </div>
+                            <div style="font-size: 13px; line-height: 1.6;">
+                                <b>HAIR:</b> {suspect.hair_color}<br>
+                                <b>EYES:</b> {suspect.eye_color}<br>
+                                <b>HOBBY:</b> {suspect.hobby}<br>
+                                <b>VEHICLE:</b> {suspect.vehicle}<br>
+                                <b>FOOD:</b> {suspect.favorite_food}<br>
+                                <b>DISTINGUISHING FEATURE:</b><br>
+                                {suspect.distinguishing_feature}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         # Arrest button at bottom
                         if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
