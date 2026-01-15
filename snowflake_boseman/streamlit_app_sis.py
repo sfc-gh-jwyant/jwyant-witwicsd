@@ -2058,31 +2058,47 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
-    # Display suspects - one per row for cleaner layout
-    for suspect in suspects:
-        with st.container():
-            # Two columns: mugshot on left (40%), details on right (60%)
-            mugshot_col, details_col = st.columns([2, 3], gap="large")
-            
-            with mugshot_col:
-                render_suspect_mugshot(suspect.id, suspect.name)
-                st.caption(suspect.name)
-            
-            with details_col:
-                st.markdown(f"**Hair:** {suspect.hair_color}")
-                st.markdown(f"**Eyes:** {suspect.eye_color}")
-                st.markdown(f"**Hobby:** {suspect.hobby}")
-                st.markdown(f"**Vehicle:** {suspect.vehicle}")
-                st.markdown(f"**Food:** {suspect.favorite_food}")
-                st.markdown(f"**Feature:** {suspect.distinguishing_feature}")
-            
-            # Arrest button spanning full width
-            if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
-                return suspect.id
-            
-            st.divider()
-                    
-                    st.markdown("---")
+    # CSS to ensure images stay in their column
+    st.markdown("""
+    <style>
+    /* Ensure suspect images don't overflow their container */
+    [data-testid="column"] > div > div > div > img {
+        max-width: 100% !important;
+        height: auto !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Display suspects in responsive grid - 2 columns on wide screens
+    for i in range(0, len(suspects), 2):
+        # Create two columns for wide screens
+        outer_cols = st.columns(2, gap="medium")
+        
+        for j, outer_col in enumerate(outer_cols):
+            if i + j < len(suspects):
+                suspect = suspects[i + j]
+                
+                with outer_col:
+                    # Container with border for each suspect card
+                    with st.container(border=True):
+                        # Inner columns: mugshot left, details right
+                        img_col, text_col = st.columns([1, 1], gap="small")
+                        
+                        with img_col:
+                            render_suspect_mugshot(suspect.id, suspect.name)
+                            st.markdown(f"**{suspect.name}**")
+                        
+                        with text_col:
+                            st.markdown(f"🎨 **Hair:** {suspect.hair_color}")
+                            st.markdown(f"👁️ **Eyes:** {suspect.eye_color}")
+                            st.markdown(f"🎯 **Hobby:** {suspect.hobby}")
+                            st.markdown(f"🚗 **Vehicle:** {suspect.vehicle}")
+                            st.markdown(f"🍽️ **Food:** {suspect.favorite_food}")
+                            st.markdown(f"✨ **Feature:** {suspect.distinguishing_feature}")
+                        
+                        # Arrest button
+                        if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
+                            return suspect.id
     
     return None
 
