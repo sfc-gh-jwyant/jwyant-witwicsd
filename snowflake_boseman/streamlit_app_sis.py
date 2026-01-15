@@ -1052,8 +1052,8 @@ Generate ONLY the witness quote, nothing else."""
                         SELECT 
                             SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_prompt}') as prompt_tokens,
                             SNOWFLAKE.CORTEX.COUNT_TOKENS('{token_count_model}', '{safe_response}') as response_tokens,
-                            COALESCE(cr.credits_per_million_input_tokens, 0.36) as input_rate,
-                            COALESCE(cr.credits_per_million_output_tokens, 0.36) as output_rate
+                            COALESCE(cr.input_rate, 0.36) as input_rate,
+                            COALESCE(cr.output_rate, 0.36) as output_rate
                         FROM (SELECT 1) dummy
                         LEFT JOIN {TABLE_PREFIX}cortex_credit_rates cr ON cr.model_name = '{model}'
                     """).collect()
@@ -1149,16 +1149,20 @@ Generate ONLY the witness quote, nothing else."""
                 "game_over": True,
             }
     
-    def _calculate_score(self, case: Case) -> float:
+    def _calculate_score(self, case: Case) -> int:
         """Calculate score for completed case.
         
-        Score is based on AI credits used - lower is better (like golf).
-        Credits = tokens * rate per million tokens for the model used.
+        Score formula: (input_tokens * input_rate) + (output_tokens * output_rate)
+        Lower is better (like golf) - fewer tokens and cheaper models = better score.
+        
+        The ai_credits field accumulates: sum of (tokens / 1M * rate) per prompt.
+        Multiply by 1M to get the raw token*rate value as the score.
         """
         if case.progress:
-            # Score is AI credits used (already calculated during gameplay)
-            # Multiply by 1000000 to get a readable number, round to int
-            return round(case.progress.ai_credits * 1000000)
+            # Score = input_tokens * input_rate + output_tokens * output_rate
+            # ai_credits = sum of (input_tokens/1M * input_rate + output_tokens/1M * output_rate)
+            # So score = ai_credits * 1M
+            return round(case.progress.ai_credits * 1_000_000)
         return 0
     
     def _update_player_stats(self, player: Player) -> bool:

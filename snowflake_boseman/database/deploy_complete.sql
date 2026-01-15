@@ -99,6 +99,61 @@ CREATE OR REPLACE TABLE stolen_items (
     category VARCHAR
 );
 
+CREATE OR REPLACE TABLE cortex_credit_rates (
+    model_name VARCHAR PRIMARY KEY,
+    input_rate FLOAT NOT NULL,  -- Credits per 1M input tokens
+    output_rate FLOAT NOT NULL, -- Credits per 1M output tokens
+    effective_date DATE
+);
+
+-- ============================================================================
+-- SEED DATA: CORTEX CREDIT RATES (per 1M tokens)
+-- Score = input_tokens * input_rate + output_tokens * output_rate
+-- ============================================================================
+
+INSERT INTO cortex_credit_rates (model_name, input_rate, output_rate, effective_date) VALUES
+-- Anthropic Claude models
+('claude-3-5-sonnet', 1.50, 7.50, '2026-01-13'),
+('claude-3-7-sonnet', 1.50, 7.50, '2026-01-13'),
+('claude-4-sonnet', 1.50, 7.50, '2026-01-13'),
+('claude-4-opus', 7.50, 37.50, '2026-01-13'),
+('claude-haiku-4-5', 0.55, 2.75, '2026-01-13'),
+('claude-opus-4-5', 2.75, 13.75, '2026-01-13'),
+('claude-sonnet-4-5', 1.65, 8.25, '2026-01-13'),
+-- DeepSeek
+('deepseek-r1', 0.68, 2.70, '2026-01-13'),
+-- Google Gemini
+('gemini-2-5-flash', 0.15, 1.25, '2026-01-13'),
+('gemini-2-5-flash-lite', 0.05, 0.20, '2026-01-13'),
+('gemini-3-pro', 1.00, 6.00, '2026-01-13'),
+-- Meta Llama
+('llama3.1-405b', 1.20, 1.20, '2026-01-13'),
+('llama3.1-70b', 0.36, 0.36, '2026-01-13'),
+('llama3.1-8b', 0.11, 0.11, '2026-01-13'),
+('llama3.3-70b', 0.36, 0.36, '2026-01-13'),
+('llama4-maverick', 0.12, 0.49, '2026-01-13'),
+('llama4-scout', 0.09, 0.33, '2026-01-13'),
+-- Mistral
+('mistral-large2', 1.00, 3.00, '2026-01-13'),
+('mistral-7b', 0.08, 0.10, '2026-01-13'),
+('mixtral-8x7b', 0.23, 0.35, '2026-01-13'),
+('pixtral-large', 1.00, 3.00, '2026-01-13'),
+-- OpenAI
+('openai-gpt-4.1', 1.00, 4.00, '2026-01-13'),
+('openai-gpt-5', 0.69, 5.50, '2026-01-13'),
+('openai-gpt-5-chat', 0.63, 5.00, '2026-01-13'),
+('openai-gpt-5-mini', 0.14, 1.10, '2026-01-13'),
+('openai-gpt-5-nano', 0.03, 0.22, '2026-01-13'),
+('openai-gpt-5.1', 0.69, 5.50, '2026-01-13'),
+('openai-gpt-5.2', 0.97, 7.70, '2026-01-13'),
+('openai-gpt-oss-120b', 0.08, 0.30, '2026-01-13'),
+('openai-gpt-oss-20b', 0.04, 0.15, '2026-01-13'),
+('openai-o4-mini', 0.55, 2.20, '2026-01-13'),
+-- Snowflake
+('snowflake-arctic', 0.84, 0.84, '2026-01-13'),
+('snowflake-llama-3.1-405b', 0.96, 0.96, '2026-01-13'),
+('snowflake-llama-3.3-70b', 0.29, 0.29, '2026-01-13');
+
 -- ============================================================================
 -- SEED DATA: 100 CITIES
 -- ============================================================================
