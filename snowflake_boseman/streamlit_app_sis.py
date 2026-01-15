@@ -2021,7 +2021,7 @@ def render_travel(controller: GameController, case: Case, current_location: Loca
 
 
 def render_suspect_mugshot(suspect_id: str, suspect_name: str):
-    """Render suspect mugshot from stage (240x120px)."""
+    """Render suspect mugshot from stage - responsive sizing."""
     extensions = ["png", "jpeg", "jpg"]
     session = get_snowflake_session()
     
@@ -2031,20 +2031,20 @@ def render_suspect_mugshot(suspect_id: str, suspect_name: str):
             try:
                 result = session.file.get(image_path, "/tmp/")
                 local_path = f"/tmp/{suspect_id}.{ext}"
-                st.image(local_path, width=240)
+                st.image(local_path, use_container_width=True)
                 return True
             except:
                 try:
-                    st.image(image_path, width=240)
+                    st.image(image_path, use_container_width=True)
                     return True
                 except:
                     pass
         except:
             continue
     
-    # Fallback placeholder
+    # Fallback placeholder - responsive
     st.markdown(f"""
-    <div style="width: 240px; height: 120px; background: rgba(0,0,0,0.3); 
+    <div style="width: 100%; aspect-ratio: 3/4; background: rgba(0,0,0,0.3); 
                 border: 2px dashed #29B5E8; border-radius: 8px; 
                 display: flex; align-items: center; justify-content: center;">
         <span style="color: #29B5E8;">🕵️ {suspect_name[:15]}</span>
@@ -2058,82 +2058,29 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
     st.markdown("### 🚨 Issue Arrest Warrant")
     st.markdown("Select the suspect you believe committed the crime:")
     
-    # Add responsive CSS for suspect cards
-    st.markdown("""
-    <style>
-    .suspect-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
-    }
-    @media (max-width: 800px) {
-        .suspect-grid {
-            grid-template-columns: 1fr;
-        }
-    }
-    .suspect-card {
-        background: rgba(0, 43, 54, 0.8);
-        border: 1px solid #29B5E8;
-        border-radius: 8px;
-        padding: 15px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 15px;
-    }
-    .suspect-mugshot {
-        flex: 1 1 45%;
-        min-width: 200px;
-        text-align: center;
-    }
-    .suspect-mugshot img {
-        width: 100%;
-        max-width: 280px;
-        height: auto;
-        border-radius: 4px;
-    }
-    .suspect-details {
-        flex: 1 1 45%;
-        min-width: 200px;
-        font-size: 14px;
-    }
-    .suspect-details p {
-        margin: 4px 0;
-    }
-    .suspect-name {
-        font-weight: bold;
-        color: #29B5E8;
-        margin-top: 8px;
-        font-size: 14px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Display suspects in responsive 2-column grid (handled by CSS)
-    for i in range(0, len(suspects), 2):
-        cols = st.columns(2)
-        
-        for j, col in enumerate(cols):
-            if i + j < len(suspects):
-                suspect = suspects[i + j]
-                with col:
-                    # Use columns for mugshot (50%) and details (50%)
-                    mugshot_col, details_col = st.columns(2)
-                    
-                    with mugshot_col:
-                        render_suspect_mugshot(suspect.id, suspect.name)
-                        st.caption(suspect.name)
-                    
-                    with details_col:
-                        st.markdown(f"**Hair:** {suspect.hair_color}")
-                        st.markdown(f"**Eyes:** {suspect.eye_color}")
-                        st.markdown(f"**Hobby:** {suspect.hobby}")
-                        st.markdown(f"**Vehicle:** {suspect.vehicle}")
-                        st.markdown(f"**Food:** {suspect.favorite_food}")
-                        st.markdown(f"**Feature:** {suspect.distinguishing_feature}")
-                    
-                    # Arrest button spanning full width
-                    if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
-                        return suspect.id
+    # Display suspects - one per row for cleaner layout
+    for suspect in suspects:
+        with st.container():
+            # Two columns: mugshot on left (40%), details on right (60%)
+            mugshot_col, details_col = st.columns([2, 3], gap="large")
+            
+            with mugshot_col:
+                render_suspect_mugshot(suspect.id, suspect.name)
+                st.caption(suspect.name)
+            
+            with details_col:
+                st.markdown(f"**Hair:** {suspect.hair_color}")
+                st.markdown(f"**Eyes:** {suspect.eye_color}")
+                st.markdown(f"**Hobby:** {suspect.hobby}")
+                st.markdown(f"**Vehicle:** {suspect.vehicle}")
+                st.markdown(f"**Food:** {suspect.favorite_food}")
+                st.markdown(f"**Feature:** {suspect.distinguishing_feature}")
+            
+            # Arrest button spanning full width
+            if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
+                return suspect.id
+            
+            st.divider()
                     
                     st.markdown("---")
     
