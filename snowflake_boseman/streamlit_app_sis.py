@@ -1581,6 +1581,7 @@ class GameState(Enum):
     TRAVEL = "travel"
     ARREST = "arrest"
     CASE_RESULT = "case_result"
+    HIGH_SCORES = "high_scores"
 
 
 # =============================================================================
@@ -1668,6 +1669,118 @@ def render_main_menu(player: Player, has_active_case: bool) -> Dict:
     if st.button("🔍 START NEW CASE", use_container_width=True, type="primary"):
         result = {"action": "new_case", "difficulty": difficulty}
     
+    st.divider()
+    
+    # High Scores button
+    if st.button("🏆 VIEW HIGH SCORES", use_container_width=True):
+        result = {"action": "high_scores"}
+    
+    return result
+
+
+def render_high_scores() -> Dict:
+    """Render high scores page."""
+    result = {"action": None}
+    
+    st.title("🏆 Hall of Fame")
+    
+    # Back button
+    if st.button("← Back to Main Menu"):
+        result = {"action": "main_menu"}
+        return result
+    
+    session = get_snowflake_session()
+    
+    # Two columns for top rankings
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🏌️ Top 10 Best Scores")
+        st.caption("Lower is better (golf rules)")
+        try:
+            best_scores = session.sql(f"""
+                SELECT p.snowflake_user as player, 
+                       MIN(hs.score) as best_score,
+                       p.rank
+                FROM {TABLE_PREFIX}high_scores hs
+                JOIN {TABLE_PREFIX}players p ON hs.player_id = p.player_id
+                GROUP BY p.snowflake_user, p.rank
+                ORDER BY best_score ASC
+                LIMIT 10
+            """).collect()
+            
+            if best_scores:
+                for i, row in enumerate(best_scores, 1):
+                    medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+                    st.markdown(f"{medal} **{row['PLAYER']}** - {row['BEST_SCORE']:,} pts ({row['RANK']})")
+            else:
+                st.info("No scores yet. Be the first to solve a case!")
+        except Exception as e:
+            st.error(f"Could not load best scores: {e}")
+    
+    with col2:
+        st.subheader("🎯 Top 10 Most Cases Solved")
+        try:
+            most_solved = session.sql(f"""
+                SELECT snowflake_user as player,
+                       cases_solved,
+                       rank,
+                       total_score as best_score
+                FROM {TABLE_PREFIX}players
+                WHERE cases_solved > 0
+                ORDER BY cases_solved DESC, total_score ASC
+                LIMIT 10
+            """).collect()
+            
+            if most_solved:
+                for i, row in enumerate(most_solved, 1):
+                    medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else f"{i}."
+                    score_str = f" (best: {row['BEST_SCORE']:,})" if row['BEST_SCORE'] else ""
+                    st.markdown(f"{medal} **{row['PLAYER']}** - {row['CASES_SOLVED']} cases{score_str}")
+            else:
+                st.info("No cases solved yet. Be the first!")
+        except Exception as e:
+            st.error(f"Could not load most solved: {e}")
+    
+    st.divider()
+    
+    # All high scores
+    st.subheader("📜 All High Scores")
+    try:
+        all_scores = session.sql(f"""
+            SELECT 
+                hs.score_id,
+                p.snowflake_user as player,
+                hs.score,
+                hs.difficulty,
+                dl.name as difficulty_name,
+                hs.completion_time_hours,
+                hs.locations_visited,
+                hs.achieved_at
+            FROM {TABLE_PREFIX}high_scores hs
+            JOIN {TABLE_PREFIX}players p ON hs.player_id = p.player_id
+            LEFT JOIN {TABLE_PREFIX}difficulty_levels dl ON hs.difficulty = dl.difficulty_id
+            ORDER BY hs.score ASC, hs.achieved_at DESC
+        """).collect()
+        
+        if all_scores:
+            # Format as a table
+            st.markdown("""
+            | Rank | Player | Score | Difficulty | Time Used | Locations | Date |
+            |------|--------|-------|------------|-----------|-----------|------|
+            """)
+            
+            for i, row in enumerate(all_scores, 1):
+                medal = "🥇" if i == 1 else "🥈" if i == 2 else "🥉" if i == 3 else str(i)
+                date_str = row['ACHIEVED_AT'].strftime("%Y-%m-%d") if row['ACHIEVED_AT'] else "N/A"
+                diff_name = row['DIFFICULTY_NAME'] or f"Level {row['DIFFICULTY']}"
+                time_used = 144 - row['COMPLETION_TIME_HOURS'] if row['COMPLETION_TIME_HOURS'] else "N/A"
+                st.markdown(f"| {medal} | {row['PLAYER']} | {row['SCORE']:,} | {diff_name} | {time_used}h | {row['LOCATIONS_VISITED']} | {date_str} |")
+        else:
+            st.info("No high scores recorded yet. Complete a case to get on the board!")
+    except Exception as e:
+        st.error(f"Could not load all scores: {e}")
+    
     return result
 
 
@@ -1735,7 +1848,7 @@ def render_investigation(controller: GameController, case: Case, location: Locat
                 clues_by_city[city].append(clue)
             
             # Display clues in a scrollable container (480px to match image height)
-            clue_html = '<div style="min-height: 480px; max-height: 480px; overflow-y: auto; padding: 0.5rem; padding-bottom: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">'
+            clue_html = '<div style="min-height: 480px; max-height: 720px; overflow-y: auto; padding: 0.5rem; padding-bottom: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px;">'
             for city, city_clues in clues_by_city.items():
                 clue_html += f'<p style="margin-bottom: 0.25rem;"><b>{city}:</b></p>'
                 for clue in city_clues:
@@ -2219,6 +2332,9 @@ def main():
             elif result["action"] == "continue":
                 st.session_state.game_state = GameState.INVESTIGATION
                 st.rerun()
+            elif result["action"] == "high_scores":
+                st.session_state.game_state = GameState.HIGH_SCORES
+                st.rerun()
         except Exception as e:
             st.error(f"Error in main menu: {e}")
             st.exception(e)
@@ -2393,6 +2509,13 @@ def main():
             st.session_state.current_case = None
             st.session_state.time_manager = None
             st.session_state.controller = GameController()  # Reset controller
+            st.session_state.game_state = GameState.MAIN_MENU
+            st.rerun()
+    
+    elif state_value == GameState.HIGH_SCORES.value:
+        result = render_high_scores()
+        
+        if result["action"] == "main_menu":
             st.session_state.game_state = GameState.MAIN_MENU
             st.rerun()
 
