@@ -67,7 +67,7 @@ def main():
     with open(INPUT_FILE, "r") as f:
         cities = [line.strip() for line in f if line.strip()]
 
-    os.makedirs("downloads", exist_ok=True)
+    os.makedirs("media", exist_ok=True)
     
     for city in cities:
         print(f"📍 {city}")
@@ -75,7 +75,7 @@ def main():
         normalized = unicodedata.normalize('NFKD', city.lower())
         # Keep only ASCII letters (a-z), remove everything else
         safe_city = re.sub(r'[^a-z]', '', normalized.encode('ascii', 'ignore').decode('ascii'))
-        download_city_image(city, f"downloads/loc_{safe_city}")
+        download_city_image(city, f"media/loc_{safe_city}")
 
 
 if __name__ == "__main__":

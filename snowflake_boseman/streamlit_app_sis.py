@@ -26,12 +26,12 @@ from datetime import datetime
 # Database and Schema Configuration
 # Set TABLE_PREFIX to use explicit fully-qualified table names
 # Set to empty string "" to use the session's default context
-TABLE_PREFIX = "DEMO_WITWISBM.GAME."  # e.g., "DEMO_WITWISBM.GAME." or ""
+TABLE_PREFIX = "TEMP.JWYANT."  # e.g., "DEMO_WITWISBM.GAME." or ""
 
 # Stage for media files (city images, landmarks, etc.)
 # Images are in the media/ folder, named like "loc_paris.jpg" or "loc_paris.png"
 # Full path format: @"DATABASE"."SCHEMA"."STAGE_NAME"/folder/file.ext
-MEDIA_STAGE = '@"DEMO_WITWISBM"."GAME"."DEMO_WITWISBM"/media'  # Stage path including media/ folder
+MEDIA_STAGE = '@"TEMP"."JWYANT"."DEMO_WITWISBM"/media'  # Stage path including media/ folder
 
 # Available AI models for Snowflake Cortex AI_COMPLETE
 # See: https://docs.snowflake.com/en/sql-reference/functions/ai_complete-single-string#arguments
@@ -351,7 +351,7 @@ def execute_write(sql: str) -> bool:
         return False
 
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour
+@st.cache_data(ttl=60)  # Cache for 1 hour
 def get_difficulty_config() -> Dict[int, Dict]:
     """Load difficulty configuration from the database."""
     try:
@@ -2066,26 +2066,29 @@ def render_arrest(controller: GameController, suspects: List[Suspect]) -> Option
             if i + j < len(suspects):
                 suspect = suspects[i + j]
                 with col:
-                    # Inner layout: mugshot+name on left, attributes on right
-                    inner_left, inner_right = st.columns([1, 2])
-                    
-                    with inner_left:
-                        render_suspect_mugshot(suspect.id, suspect.name)
-                        st.markdown(f"**{suspect.name}**")
-                    
-                    with inner_right:
-                        st.markdown(f"""
-                        - **Hair:** {suspect.hair_color}
-                        - **Eyes:** {suspect.eye_color}
-                        - **Hobby:** {suspect.hobby}
-                        - **Vehicle:** {suspect.vehicle}
-                        - **Food:** {suspect.favorite_food}
-                        - **Feature:** {suspect.distinguishing_feature}
-                        """)
-                    
-                    # Arrest button below
-                    if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
-                        return suspect.id
+                    # Container for the suspect card
+                    with st.container():
+                        # Use a clear two-column layout with explicit gap
+                        mugshot_col, attr_col = st.columns([1, 1], gap="medium")
+                        
+                        with mugshot_col:
+                            # Mugshot image
+                            render_suspect_mugshot(suspect.id, suspect.name)
+                            # Suspect name below mugshot
+                            st.markdown(f"**{suspect.name}**")
+                        
+                        with attr_col:
+                            # Attributes list - use proper markdown without leading spaces
+                            st.markdown(f"• **Hair:** {suspect.hair_color}")
+                            st.markdown(f"• **Eyes:** {suspect.eye_color}")
+                            st.markdown(f"• **Hobby:** {suspect.hobby}")
+                            st.markdown(f"• **Vehicle:** {suspect.vehicle}")
+                            st.markdown(f"• **Food:** {suspect.favorite_food}")
+                            st.markdown(f"• **Feature:** {suspect.distinguishing_feature}")
+                        
+                        # Arrest button spanning full width below
+                        if st.button(f"🚨 ARREST", key=f"arrest_{suspect.id}", use_container_width=True):
+                            return suspect.id
         
         st.divider()
     
